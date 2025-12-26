@@ -229,9 +229,9 @@ NEXT_PUBLIC_AMADEUS_CLIENT_SECRET=your_api_secret`}
               </div>
 
               {/* Search Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* From */}
-                <div className="lg:col-span-1">
+                <div className="relative">
                   <AirportAutocomplete
                     label="From"
                     value={fromDisplay}
@@ -248,27 +248,8 @@ NEXT_PUBLIC_AMADEUS_CLIENT_SECRET=your_api_secret`}
                   />
                 </div>
 
-                {/* Swap Button */}
-                <div className="hidden lg:flex items-end justify-center pb-3">
-                  <button 
-                    onClick={() => { 
-                      const tempCode = from; 
-                      const tempDisplay = fromDisplay;
-                      setFrom(to); 
-                      setFromDisplay(toDisplay);
-                      setTo(tempCode); 
-                      setToDisplay(tempDisplay);
-                    }}
-                    className="p-2 bg-midnight-100 hover:bg-coral-100 rounded-full transition-colors"
-                  >
-                    <svg className="w-5 h-5 text-midnight-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                    </svg>
-                  </button>
-                </div>
-
                 {/* To */}
-                <div className="lg:col-span-1">
+                <div className="relative">
                   <AirportAutocomplete
                     label="To"
                     value={toDisplay}
@@ -283,9 +264,27 @@ NEXT_PUBLIC_AMADEUS_CLIENT_SECRET=your_api_secret`}
                     }}
                     placeholder="City or airport"
                   />
+                  {/* Swap Button - positioned between fields */}
+                  <button 
+                    onClick={() => { 
+                      const tempCode = from; 
+                      const tempDisplay = fromDisplay;
+                      setFrom(to); 
+                      setFromDisplay(toDisplay);
+                      setTo(tempCode); 
+                      setToDisplay(tempDisplay);
+                    }}
+                    className="absolute -left-6 top-9 p-2 bg-white border border-midnight-200 hover:bg-coral-50 hover:border-coral-300 rounded-full transition-colors shadow-sm z-10 hidden md:flex"
+                  >
+                    <svg className="w-4 h-4 text-midnight-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </button>
                 </div>
+              </div>
 
-                {/* Depart Date */}
+              {/* Date Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-midnight-600 mb-2">Depart</label>
                   <input
