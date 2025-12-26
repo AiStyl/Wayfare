@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
+import CityAutocomplete from '@/components/CityAutocomplete';
 
 interface LocalGuide {
   category: string;
@@ -93,25 +94,24 @@ export default function GuidesPage() {
           {/* Search */}
           <div className="max-w-3xl mx-auto mb-12">
             <div className="bg-white rounded-3xl shadow-elevated p-6 md:p-8 border border-midnight-100">
-              <label className="block text-lg font-display font-medium text-midnight-900 mb-4">
-                Where are you headed?
-              </label>
               <div className="flex gap-4">
-                <input
-                  type="text"
-                  value={destination}
-                  onChange={(e) => setDestination(e.target.value)}
-                  placeholder="Enter a city or destination..."
-                  className="flex-1 px-6 py-4 bg-midnight-50 border border-midnight-200 rounded-xl text-lg text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                />
-                <button
-                  onClick={() => handleSearch()}
-                  disabled={isSearching}
-                  className="px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50"
-                >
-                  {isSearching ? 'Loading...' : 'Explore'}
-                </button>
+                <div className="flex-1">
+                  <CityAutocomplete
+                    label="Where are you headed?"
+                    value={destination}
+                    onChange={(value) => setDestination(value)}
+                    placeholder="Enter a city or destination..."
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    onClick={() => handleSearch()}
+                    disabled={isSearching}
+                    className="px-8 py-3 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.02] transition-all disabled:opacity-50"
+                  >
+                    {isSearching ? 'Loading...' : 'Explore'}
+                  </button>
+                </div>
               </div>
 
               {/* Popular Destinations */}

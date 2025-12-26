@@ -4,92 +4,255 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
+import CityAutocomplete, { City } from '@/components/CityAutocomplete';
 
-interface HotelResult {
+interface HotelOffer {
   id: string;
   name: string;
   rating: number;
-  reviewCount: number;
-  location: string;
-  image: string;
+  address: string;
+  distance: string;
+  price: number;
+  currency: string;
   amenities: string[];
-  prices: {
-    source: string;
-    price: number;
-    totalWithFees: number;
-  }[];
-  bestDeal: string;
+  roomType: string;
+  bookingUrl: string;
 }
 
-const demoHotels: HotelResult[] = [
-  {
-    id: '1',
-    name: 'The Ritz-Carlton, New York',
-    rating: 4.8,
-    reviewCount: 2847,
-    location: 'Central Park South',
-    image: '🏨',
-    amenities: ['Spa', 'Pool', 'Restaurant', 'Gym', 'Valet'],
-    prices: [
-      { source: 'Booking.com', price: 895, totalWithFees: 1042 },
-      { source: 'Hotels.com', price: 920, totalWithFees: 1058 },
-      { source: 'Expedia', price: 879, totalWithFees: 1025 },
-      { source: 'Direct', price: 950, totalWithFees: 1045 },
-    ],
-    bestDeal: 'Expedia',
-  },
-  {
-    id: '2',
-    name: 'Park Hyatt New York',
-    rating: 4.7,
-    reviewCount: 1923,
-    location: 'Midtown West',
-    image: '🏨',
-    amenities: ['Spa', 'Restaurant', 'Gym', 'Bar', 'Concierge'],
-    prices: [
-      { source: 'Booking.com', price: 725, totalWithFees: 845 },
-      { source: 'Hotels.com', price: 750, totalWithFees: 862 },
-      { source: 'Expedia', price: 735, totalWithFees: 851 },
-      { source: 'Direct', price: 700, totalWithFees: 812 },
-    ],
-    bestDeal: 'Direct',
-  },
-  {
-    id: '3',
-    name: 'The Standard High Line',
-    rating: 4.5,
-    reviewCount: 3421,
-    location: 'Meatpacking District',
-    image: '🏨',
-    amenities: ['Rooftop Bar', 'Restaurant', 'Gym', 'Bikes'],
-    prices: [
-      { source: 'Booking.com', price: 385, totalWithFees: 452 },
-      { source: 'Hotels.com', price: 395, totalWithFees: 465 },
-      { source: 'Expedia', price: 379, totalWithFees: 445 },
-      { source: 'Direct', price: 410, totalWithFees: 472 },
-    ],
-    bestDeal: 'Expedia',
-  },
-];
+// Amadeus API credentials from environment
+const AMADEUS_CLIENT_ID = process.env.NEXT_PUBLIC_AMADEUS_CLIENT_ID;
+const AMADEUS_CLIENT_SECRET = process.env.NEXT_PUBLIC_AMADEUS_CLIENT_SECRET;
+const API_CONFIGURED = !!(AMADEUS_CLIENT_ID && AMADEUS_CLIENT_SECRET);
+
+// City to Amadeus city code mapping
+const cityCodeMap: Record<string, string> = {
+  'New York': 'NYC',
+  'Los Angeles': 'LAX',
+  'Chicago': 'CHI',
+  'San Francisco': 'SFO',
+  'Las Vegas': 'LAS',
+  'Miami': 'MIA',
+  'Orlando': 'ORL',
+  'Seattle': 'SEA',
+  'Boston': 'BOS',
+  'Washington D.C.': 'WAS',
+  'Denver': 'DEN',
+  'London': 'LON',
+  'Paris': 'PAR',
+  'Rome': 'ROM',
+  'Barcelona': 'BCN',
+  'Madrid': 'MAD',
+  'Amsterdam': 'AMS',
+  'Berlin': 'BER',
+  'Munich': 'MUC',
+  'Vienna': 'VIE',
+  'Prague': 'PRG',
+  'Budapest': 'BUD',
+  'Dublin': 'DUB',
+  'Lisbon': 'LIS',
+  'Athens': 'ATH',
+  'Milan': 'MIL',
+  'Venice': 'VCE',
+  'Florence': 'FLR',
+  'Zurich': 'ZRH',
+  'Geneva': 'GVA',
+  'Copenhagen': 'CPH',
+  'Stockholm': 'STO',
+  'Tokyo': 'TYO',
+  'Seoul': 'SEL',
+  'Singapore': 'SIN',
+  'Bangkok': 'BKK',
+  'Hong Kong': 'HKG',
+  'Dubai': 'DXB',
+  'Sydney': 'SYD',
+  'Melbourne': 'MEL',
+  'Auckland': 'AKL',
+  'Toronto': 'YTO',
+  'Vancouver': 'YVR',
+  'Cancun': 'CUN',
+  'Mexico City': 'MEX',
+};
 
 export default function HotelsPage() {
-  const [destination, setDestination] = useState('New York');
-  const [checkIn, setCheckIn] = useState('2025-02-15');
-  const [checkOut, setCheckOut] = useState('2025-02-18');
+  const [destination, setDestination] = useState('');
+  const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  const [checkIn, setCheckIn] = useState('');
+  const [checkOut, setCheckOut] = useState('');
   const [guests, setGuests] = useState(2);
   const [rooms, setRooms] = useState(1);
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<HotelResult[]>([]);
-  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'reviews'>('price');
+  const [results, setResults] = useState<HotelOffer[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'price' | 'rating' | 'distance'>('price');
+
+  // Set default dates
+  useState(() => {
+    const today = new Date();
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const weekAfter = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+    setCheckIn(nextWeek.toISOString().split('T')[0]);
+    setCheckOut(weekAfter.toISOString().split('T')[0]);
+  });
 
   const handleSearch = async () => {
+    if (!destination || !checkIn || !checkOut) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!API_CONFIGURED) {
+      setError('API credentials not configured. See setup instructions below.');
+      return;
+    }
+
+    const cityCode = cityCodeMap[destination] || destination.substring(0, 3).toUpperCase();
+
     setIsSearching(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setResults(demoHotels);
-    setIsSearching(false);
+    setError(null);
+    setResults([]);
+
+    try {
+      // Get Amadeus access token
+      const tokenResponse = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: AMADEUS_CLIENT_ID!,
+          client_secret: AMADEUS_CLIENT_SECRET!,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to authenticate with Amadeus API');
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = tokenData.access_token;
+
+      // Search for hotels by city
+      const hotelListParams = new URLSearchParams({
+        cityCode: cityCode,
+        radius: '30',
+        radiusUnit: 'KM',
+        hotelSource: 'ALL',
+      });
+
+      const hotelListResponse = await fetch(
+        `https://api.amadeus.com/v1/reference-data/locations/hotels/by-city?${hotelListParams}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!hotelListResponse.ok) {
+        const errorData = await hotelListResponse.json();
+        throw new Error(errorData.errors?.[0]?.detail || 'Failed to fetch hotels');
+      }
+
+      const hotelListData = await hotelListResponse.json();
+      
+      if (!hotelListData.data || hotelListData.data.length === 0) {
+        setError('No hotels found for this destination. Try a different city.');
+        setIsSearching(false);
+        return;
+      }
+
+      // Get first 10 hotel IDs for pricing
+      const hotelIds = hotelListData.data.slice(0, 10).map((h: any) => h.hotelId);
+
+      // Get hotel offers (prices)
+      const offersParams = new URLSearchParams({
+        hotelIds: hotelIds.join(','),
+        checkInDate: checkIn,
+        checkOutDate: checkOut,
+        adults: guests.toString(),
+        roomQuantity: rooms.toString(),
+        currency: 'USD',
+      });
+
+      const offersResponse = await fetch(
+        `https://api.amadeus.com/v3/shopping/hotel-offers?${offersParams}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!offersResponse.ok) {
+        // If offers fail, show hotels without prices
+        const hotels: HotelOffer[] = hotelListData.data.slice(0, 10).map((hotel: any, index: number) => ({
+          id: hotel.hotelId || index.toString(),
+          name: hotel.name || 'Hotel',
+          rating: hotel.rating ? parseInt(hotel.rating) : 4,
+          address: hotel.address?.countryCode || destination,
+          distance: hotel.distance?.value ? `${hotel.distance.value} ${hotel.distance.unit}` : 'City center',
+          price: 0,
+          currency: 'USD',
+          amenities: [],
+          roomType: 'Standard Room',
+          bookingUrl: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(destination)}`,
+        }));
+        
+        setResults(hotels);
+        setError('Prices unavailable for these dates. Showing hotels only.');
+        setIsSearching(false);
+        return;
+      }
+
+      const offersData = await offersResponse.json();
+
+      // Transform to our format
+      const hotels: HotelOffer[] = offersData.data.map((hotel: any, index: number) => {
+        const offer = hotel.offers?.[0];
+        return {
+          id: hotel.hotel?.hotelId || index.toString(),
+          name: hotel.hotel?.name || 'Hotel',
+          rating: hotel.hotel?.rating ? parseInt(hotel.hotel.rating) : 4,
+          address: hotel.hotel?.address?.lines?.[0] || destination,
+          distance: hotel.hotel?.distance?.value 
+            ? `${hotel.hotel.distance.value} ${hotel.hotel.distance.unit} from center`
+            : 'City center',
+          price: offer?.price?.total ? parseFloat(offer.price.total) : 0,
+          currency: offer?.price?.currency || 'USD',
+          amenities: hotel.hotel?.amenities?.slice(0, 4) || [],
+          roomType: offer?.room?.typeEstimated?.category || 'Standard Room',
+          bookingUrl: `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(destination)}&checkin=${checkIn}&checkout=${checkOut}`,
+        };
+      });
+
+      setResults(hotels.filter((h: HotelOffer) => h.price > 0));
+      
+      if (hotels.filter((h: HotelOffer) => h.price > 0).length === 0) {
+        setError('No available rooms for these dates. Try different dates.');
+      }
+    } catch (err: any) {
+      console.error('Hotel search error:', err);
+      setError(err.message || 'Failed to search hotels. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const nights = Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24));
+  const sortedResults = [...results].sort((a, b) => {
+    if (sortBy === 'price') return a.price - b.price;
+    if (sortBy === 'rating') return b.rating - a.rating;
+    return parseFloat(a.distance) - parseFloat(b.distance);
+  });
+
+  const calculateNights = () => {
+    if (!checkIn || !checkOut) return 0;
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const nights = calculateNights();
 
   return (
     <>
@@ -101,29 +264,51 @@ export default function HotelsPage() {
           <ToolPageHeader 
             icon="🏨"
             name="StayCompare"
-            tagline="Hotel Price Compare"
-            description="See the real price after fees. Compare hotels across Booking.com, Expedia, Hotels.com, and direct booking in one view."
+            tagline="Hotel Intelligence"
+            description="Search real-time hotel prices across booking platforms. Powered by Amadeus API."
           />
+
+          {/* API Status Banner */}
+          {!API_CONFIGURED && (
+            <div className="max-w-5xl mx-auto mb-8">
+              <div className="bg-gold-50 border-2 border-gold-300 rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-3xl">🔑</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gold-900 text-lg mb-2">API Integration Required</h3>
+                    <p className="text-gold-800 mb-4">
+                      StayCompare uses the Amadeus API for real hotel data. Add your credentials to enable.
+                    </p>
+                    <pre className="bg-midnight-900 text-green-400 p-4 rounded-xl text-sm overflow-x-auto">
+{`NEXT_PUBLIC_AMADEUS_CLIENT_ID=your_api_key
+NEXT_PUBLIC_AMADEUS_CLIENT_SECRET=your_api_secret`}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Search Form */}
           <div className="max-w-5xl mx-auto mb-12">
             <div className="bg-white rounded-3xl shadow-elevated p-6 md:p-8 border border-midnight-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {/* Destination */}
-                <div className="lg:col-span-1">
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Destination</label>
-                  <input
-                    type="text"
+                <div className="lg:col-span-2">
+                  <CityAutocomplete
+                    label="Destination"
                     value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="City, hotel, or landmark"
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
+                    onChange={(value, city) => {
+                      setDestination(value);
+                      if (city) setSelectedCity(city);
+                    }}
+                    placeholder="Where are you going?"
                   />
                 </div>
 
-                {/* Check In */}
+                {/* Check-in */}
                 <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Check In</label>
+                  <label className="block text-sm font-medium text-midnight-600 mb-2">Check-in</label>
                   <input
                     type="date"
                     value={checkIn}
@@ -132,9 +317,9 @@ export default function HotelsPage() {
                   />
                 </div>
 
-                {/* Check Out */}
+                {/* Check-out */}
                 <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Check Out</label>
+                  <label className="block text-sm font-medium text-midnight-600 mb-2">Check-out</label>
                   <input
                     type="date"
                     value={checkOut}
@@ -142,195 +327,191 @@ export default function HotelsPage() {
                     className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
                   />
                 </div>
-
-                {/* Guests & Rooms */}
-                <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Guests & Rooms</label>
-                  <div className="flex gap-2">
-                    <select
-                      value={guests}
-                      onChange={(e) => setGuests(Number(e.target.value))}
-                      className="flex-1 px-3 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400"
-                    >
-                      {[1, 2, 3, 4, 5, 6].map(n => (
-                        <option key={n} value={n}>{n} guest{n > 1 ? 's' : ''}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={rooms}
-                      onChange={(e) => setRooms(Number(e.target.value))}
-                      className="flex-1 px-3 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400"
-                    >
-                      {[1, 2, 3, 4].map(n => (
-                        <option key={n} value={n}>{n} room{n > 1 ? 's' : ''}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
               </div>
 
-              <button
-                onClick={handleSearch}
-                disabled={isSearching}
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:shadow-coral-400/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50"
-              >
-                {isSearching ? (
-                  <>
-                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Comparing Prices...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    Compare Hotels
-                  </>
-                )}
-              </button>
+              {/* Guests & Rooms */}
+              <div className="flex flex-wrap items-center gap-4 mb-6">
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-midnight-600">Guests:</label>
+                  <select
+                    value={guests}
+                    onChange={(e) => setGuests(Number(e.target.value))}
+                    className="px-4 py-2 bg-midnight-50 border border-midnight-200 rounded-lg text-midnight-900 focus:outline-none focus:border-coral-400"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map(n => (
+                      <option key={n} value={n}>{n} {n === 1 ? 'guest' : 'guests'}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="text-sm font-medium text-midnight-600">Rooms:</label>
+                  <select
+                    value={rooms}
+                    onChange={(e) => setRooms(Number(e.target.value))}
+                    className="px-4 py-2 bg-midnight-50 border border-midnight-200 rounded-lg text-midnight-900 focus:outline-none focus:border-coral-400"
+                  >
+                    {[1, 2, 3, 4].map(n => (
+                      <option key={n} value={n}>{n} {n === 1 ? 'room' : 'rooms'}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleSearch}
+                  disabled={isSearching || !destination}
+                  className="ml-auto inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSearching ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Search Hotels
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="max-w-5xl mx-auto mb-8">
+              <div className="bg-coral-50 border border-coral-200 rounded-xl p-4 text-coral-700">
+                {error}
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           {results.length > 0 && (
-            <div className="mb-16 animate-fade-in">
+            <div className="max-w-5xl mx-auto mb-16 animate-fade-in">
               {/* Results Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
                   <h2 className="text-2xl font-display font-semibold text-midnight-900">
-                    {results.length} hotels in {destination}
+                    {results.length} hotels found
                   </h2>
                   <p className="text-midnight-500">
-                    {nights} night{nights > 1 ? 's' : ''} · {guests} guest{guests > 1 ? 's' : ''} · {rooms} room{rooms > 1 ? 's' : ''}
+                    {destination} · {nights} {nights === 1 ? 'night' : 'nights'} · {guests} {guests === 1 ? 'guest' : 'guests'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-midnight-500">Sort by:</span>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'price' | 'rating' | 'reviews')}
+                    onChange={(e) => setSortBy(e.target.value as 'price' | 'rating' | 'distance')}
                     className="px-4 py-2 bg-white border border-midnight-200 rounded-lg text-midnight-700 focus:outline-none focus:border-coral-400"
                   >
-                    <option value="price">Lowest Price</option>
-                    <option value="rating">Highest Rating</option>
-                    <option value="reviews">Most Reviews</option>
+                    <option value="price">Price (Low to High)</option>
+                    <option value="rating">Rating (High to Low)</option>
+                    <option value="distance">Distance (Closest)</option>
                   </select>
                 </div>
               </div>
 
+              {/* Live Data Badge */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
+                <span className="text-sm text-midnight-500">Real-time prices from Amadeus</span>
+              </div>
+
               {/* Hotel Cards */}
-              <div className="space-y-6">
-                {results.map((hotel) => {
-                  const lowestPrice = Math.min(...hotel.prices.map(p => p.totalWithFees));
-                  const highestPrice = Math.max(...hotel.prices.map(p => p.totalWithFees));
-                  const savings = highestPrice - lowestPrice;
-
-                  return (
-                    <div 
-                      key={hotel.id}
-                      className="bg-white rounded-2xl border border-midnight-100 overflow-hidden hover:shadow-card-hover hover:border-coral-200 transition-all duration-300"
-                    >
-                      <div className="flex flex-col lg:flex-row">
-                        {/* Hotel Image & Info */}
-                        <div className="lg:w-1/3 p-6 bg-gradient-to-br from-midnight-50 to-midnight-100">
-                          <div className="flex items-start gap-4">
-                            <div className="w-24 h-24 bg-white rounded-xl flex items-center justify-center text-5xl">
-                              {hotel.image}
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl font-display font-semibold text-midnight-900 mb-1">
-                                {hotel.name}
-                              </h3>
-                              <p className="text-midnight-500 text-sm mb-2">📍 {hotel.location}</p>
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 bg-coral-100 text-coral-700 text-sm font-medium rounded-lg">
-                                  ★ {hotel.rating}
-                                </span>
-                                <span className="text-midnight-400 text-sm">
-                                  ({hotel.reviewCount.toLocaleString()} reviews)
-                                </span>
+              <div className="space-y-4">
+                {sortedResults.map((hotel) => (
+                  <div 
+                    key={hotel.id}
+                    className="bg-white rounded-2xl border border-midnight-100 p-6 hover:shadow-card-hover hover:border-coral-200 transition-all duration-300"
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      {/* Hotel Info */}
+                      <div className="flex-1">
+                        <div className="flex items-start gap-4">
+                          <div className="w-16 h-16 bg-midnight-100 rounded-xl flex items-center justify-center text-2xl">
+                            🏨
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-midnight-900 text-lg">{hotel.name}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex">
+                                {[...Array(hotel.rating)].map((_, i) => (
+                                  <span key={i} className="text-gold-400">★</span>
+                                ))}
                               </div>
+                              <span className="text-sm text-midnight-500">{hotel.distance}</span>
                             </div>
-                          </div>
-                          <div className="flex flex-wrap gap-2 mt-4">
-                            {hotel.amenities.map((amenity) => (
-                              <span key={amenity} className="px-3 py-1 bg-white text-midnight-600 text-xs rounded-full">
-                                {amenity}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Price Comparison */}
-                        <div className="lg:w-2/3 p-6">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-medium text-midnight-700">Price Comparison (with fees)</h4>
-                            {savings > 0 && (
-                              <span className="px-3 py-1 bg-teal-100 text-teal-700 text-sm font-medium rounded-full">
-                                Save up to ${savings}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                            {hotel.prices.map((price) => (
-                              <div 
-                                key={price.source}
-                                className={`p-4 rounded-xl border-2 transition-colors ${
-                                  price.totalWithFees === lowestPrice
-                                    ? 'border-teal-400 bg-teal-50'
-                                    : 'border-midnight-100 bg-white hover:border-midnight-200'
-                                }`}
-                              >
-                                <p className="text-sm text-midnight-500 mb-1">{price.source}</p>
-                                <p className="text-xs text-midnight-400 line-through">${price.price}/night</p>
-                                <p className="text-xl font-bold text-midnight-900">${price.totalWithFees}</p>
-                                <p className="text-xs text-midnight-400">total with fees</p>
-                                {price.totalWithFees === lowestPrice && (
-                                  <span className="inline-block mt-2 text-xs text-teal-600 font-medium">
-                                    ✓ Best Deal
+                            <p className="text-sm text-midnight-500 mt-1">{hotel.address}</p>
+                            {hotel.amenities.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {hotel.amenities.map((amenity, i) => (
+                                  <span 
+                                    key={i}
+                                    className="px-2 py-1 bg-midnight-50 text-midnight-600 text-xs rounded-lg"
+                                  >
+                                    {amenity.replace(/_/g, ' ').toLowerCase()}
                                   </span>
-                                )}
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 flex justify-end">
-                            <button className="px-6 py-3 bg-coral-500 hover:bg-coral-600 text-white font-medium rounded-xl transition-colors">
-                              Book on {hotel.bestDeal} →
-                            </button>
+                            )}
                           </div>
                         </div>
                       </div>
+
+                      {/* Price & Book */}
+                      <div className="flex items-center gap-6 lg:text-right">
+                        <div>
+                          <p className="text-sm text-midnight-500">{nights} {nights === 1 ? 'night' : 'nights'}</p>
+                          <p className="text-3xl font-bold text-midnight-900">
+                            ${Math.round(hotel.price)}
+                          </p>
+                          <p className="text-xs text-midnight-400">total</p>
+                        </div>
+                        <a
+                          href={hotel.bookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-6 py-3 bg-coral-500 hover:bg-coral-600 text-white font-medium rounded-xl transition-colors whitespace-nowrap"
+                        >
+                          View Deal
+                        </a>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
           {/* Info Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <WhyUseCard 
               points={[
-                'Compare prices across 10+ booking sites',
-                'See true cost including all taxes and fees',
-                'Read aggregated reviews from multiple sources',
-                'Find hidden deals and member discounts',
+                'Real-time prices from Amadeus API',
+                'Compare across hotel inventory',
+                'No markup — see actual rates',
+                'Sort by price, rating, or distance',
               ]}
             />
             <HowAICard 
-              description="StayCompare aggregates real-time pricing from all major hotel booking platforms and calculates the true total cost."
+              description="StayCompare connects to Amadeus, the same API that powers major travel agencies worldwide."
               capabilities={[
-                'Real-time price aggregation',
-                'Fee and tax calculation',
-                'Review sentiment analysis',
-                'Deal quality scoring',
+                'Real-time hotel availability',
+                'Accurate pricing from hotels',
+                'Global hotel coverage',
+                'Live inventory data',
               ]}
             />
             <QphiQInsight 
-              insight="Booking directly with hotels often includes perks like free breakfast or room upgrades not available on OTAs. Always check the hotel's website before booking elsewhere."
+              insight="Book hotels directly when possible — loyalty points add up. Use aggregators to find the best price, then book on the hotel's site for perks."
             />
           </div>
         </div>

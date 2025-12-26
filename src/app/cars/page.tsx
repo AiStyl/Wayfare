@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
+import CityAutocomplete from '@/components/CityAutocomplete';
 
 interface RentalResult {
   id: string;
@@ -140,13 +141,11 @@ export default function CarsPage() {
             <div className="bg-white rounded-3xl shadow-elevated p-6 md:p-8 border border-midnight-100">
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Pickup Location</label>
-                  <input
-                    type="text"
+                  <CityAutocomplete
+                    label="Pickup Location"
                     value={pickupLocation}
-                    onChange={(e) => setPickupLocation(e.target.value)}
+                    onChange={(value) => setPickupLocation(value)}
                     placeholder="Airport, city, or address"
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
                   />
                 </div>
                 <div>
