@@ -80,7 +80,7 @@ export function QphiQInsight({ insight }: QphiQInsightProps) {
         </div>
         <div>
           <h3 className="font-display font-semibold text-white mb-2 flex items-center gap-2">
-            QphiQ Insight
+            WAYFARE Insight
             <span className="text-xs font-normal text-coral-200 bg-coral-500/30 px-2 py-0.5 rounded-full">
               AI Analysis
             </span>

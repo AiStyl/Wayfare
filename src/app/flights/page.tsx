@@ -303,7 +303,7 @@ export default function FlightsPage() {
                       <div className="flex items-center gap-6">
                         <div className="text-center">
                           <p className="text-2xl font-semibold text-midnight-900">{flight.departureTime}</p>
-                          <p className="text-sm text-midnight-500">{flight.departure}</p>
+                          <p className="text-sm text-midnight-500">{from}</p>
                         </div>
                         <div className="flex flex-col items-center">
                           <p className="text-xs text-midnight-400 mb-1">{flight.duration}</p>
@@ -316,7 +316,7 @@ export default function FlightsPage() {
                         </div>
                         <div className="text-center">
                           <p className="text-2xl font-semibold text-midnight-900">{flight.arrivalTime}</p>
-                          <p className="text-sm text-midnight-500">{flight.arrival}</p>
+                          <p className="text-sm text-midnight-500">{to}</p>
                         </div>
                       </div>
 
