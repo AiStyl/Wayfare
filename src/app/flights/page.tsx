@@ -6,108 +6,155 @@ import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
 import AirportAutocomplete from '@/components/AirportAutocomplete';
 
-interface FlightResult {
+interface FlightOffer {
   id: string;
   airline: string;
   airlineCode: string;
-  departure: string;
-  arrival: string;
   departureTime: string;
   arrivalTime: string;
   duration: string;
   stops: number;
   price: number;
-  priceChange: 'up' | 'down' | 'stable';
-  prediction: string;
+  currency: string;
   bookingUrl: string;
 }
 
-const demoFlights: FlightResult[] = [
-  {
-    id: '1',
-    airline: 'United Airlines',
-    airlineCode: 'UA',
-    departure: 'SFO',
-    arrival: 'JFK',
-    departureTime: '6:00 AM',
-    arrivalTime: '2:45 PM',
-    duration: '5h 45m',
-    stops: 0,
-    price: 287,
-    priceChange: 'down',
-    prediction: 'Prices likely to rise 12% in next 3 days',
-    bookingUrl: '#',
-  },
-  {
-    id: '2',
-    airline: 'Delta',
-    airlineCode: 'DL',
-    departure: 'SFO',
-    arrival: 'JFK',
-    departureTime: '8:30 AM',
-    arrivalTime: '5:05 PM',
-    duration: '5h 35m',
-    stops: 0,
-    price: 312,
-    priceChange: 'stable',
-    prediction: 'Good price for this route',
-    bookingUrl: '#',
-  },
-  {
-    id: '3',
-    airline: 'American Airlines',
-    airlineCode: 'AA',
-    departure: 'SFO',
-    arrival: 'JFK',
-    departureTime: '11:15 AM',
-    arrivalTime: '10:30 PM',
-    duration: '8h 15m',
-    stops: 1,
-    price: 198,
-    priceChange: 'down',
-    prediction: 'Best value option with 1 stop',
-    bookingUrl: '#',
-  },
-  {
-    id: '4',
-    airline: 'JetBlue',
-    airlineCode: 'B6',
-    departure: 'SFO',
-    arrival: 'JFK',
-    departureTime: '2:00 PM',
-    arrivalTime: '10:35 PM',
-    duration: '5h 35m',
-    stops: 0,
-    price: 329,
-    priceChange: 'up',
-    prediction: 'Wait — price dropped 8% yesterday',
-    bookingUrl: '#',
-  },
-];
+// Check if Amadeus API credentials are configured
+const AMADEUS_CLIENT_ID = process.env.NEXT_PUBLIC_AMADEUS_CLIENT_ID;
+const AMADEUS_CLIENT_SECRET = process.env.NEXT_PUBLIC_AMADEUS_CLIENT_SECRET;
+const API_CONFIGURED = !!(AMADEUS_CLIENT_ID && AMADEUS_CLIENT_SECRET);
 
 export default function FlightsPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [fromDisplay, setFromDisplay] = useState('');
   const [toDisplay, setToDisplay] = useState('');
-  const [departDate, setDepartDate] = useState('2025-02-15');
-  const [returnDate, setReturnDate] = useState('2025-02-22');
+  const [departDate, setDepartDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
   const [tripType, setTripType] = useState<'roundtrip' | 'oneway'>('roundtrip');
   const [passengers, setPassengers] = useState(1);
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<FlightResult[]>([]);
+  const [results, setResults] = useState<FlightOffer[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'price' | 'duration' | 'departure'>('price');
 
+  // Set default dates to 2 weeks from now
+  useState(() => {
+    const today = new Date();
+    const twoWeeks = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const threeWeeks = new Date(today.getTime() + 21 * 24 * 60 * 60 * 1000);
+    setDepartDate(twoWeeks.toISOString().split('T')[0]);
+    setReturnDate(threeWeeks.toISOString().split('T')[0]);
+  });
+
   const handleSearch = async () => {
+    if (!from || !to || !departDate) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!API_CONFIGURED) {
+      setError('API credentials not configured. See setup instructions below.');
+      return;
+    }
+
     setIsSearching(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setResults(demoFlights);
-    setIsSearching(false);
+    setError(null);
+    setResults([]);
+
+    try {
+      // Get Amadeus access token
+      const tokenResponse = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: AMADEUS_CLIENT_ID!,
+          client_secret: AMADEUS_CLIENT_SECRET!,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to authenticate with Amadeus API');
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = tokenData.access_token;
+
+      // Search for flights
+      const searchParams = new URLSearchParams({
+        originLocationCode: from,
+        destinationLocationCode: to,
+        departureDate: departDate,
+        adults: passengers.toString(),
+        currencyCode: 'USD',
+        max: '20',
+      });
+
+      if (tripType === 'roundtrip' && returnDate) {
+        searchParams.append('returnDate', returnDate);
+      }
+
+      const flightResponse = await fetch(
+        `https://api.amadeus.com/v2/shopping/flight-offers?${searchParams}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!flightResponse.ok) {
+        throw new Error('Failed to fetch flight offers');
+      }
+
+      const flightData = await flightResponse.json();
+      
+      // Transform Amadeus response to our format
+      const flights: FlightOffer[] = flightData.data.map((offer: any, index: number) => {
+        const segment = offer.itineraries[0].segments[0];
+        const lastSegment = offer.itineraries[0].segments[offer.itineraries[0].segments.length - 1];
+        
+        return {
+          id: offer.id || index.toString(),
+          airline: flightData.dictionaries?.carriers?.[segment.carrierCode] || segment.carrierCode,
+          airlineCode: segment.carrierCode,
+          departureTime: new Date(segment.departure.at).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          arrivalTime: new Date(lastSegment.arrival.at).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          duration: offer.itineraries[0].duration.replace('PT', '').toLowerCase(),
+          stops: offer.itineraries[0].segments.length - 1,
+          price: parseFloat(offer.price.total),
+          currency: offer.price.currency,
+          bookingUrl: `https://www.google.com/flights?q=flights+from+${from}+to+${to}`,
+        };
+      });
+
+      setResults(flights);
+    } catch (err: any) {
+      console.error('Flight search error:', err);
+      setError(err.message || 'Failed to search flights. Please try again.');
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   const sortedResults = [...results].sort((a, b) => {
     if (sortBy === 'price') return a.price - b.price;
-    if (sortBy === 'duration') return parseInt(a.duration) - parseInt(b.duration);
+    if (sortBy === 'duration') {
+      const aDur = parseInt(a.duration.replace(/\D/g, ''));
+      const bDur = parseInt(b.duration.replace(/\D/g, ''));
+      return aDur - bDur;
+    }
     return a.departureTime.localeCompare(b.departureTime);
   });
 
@@ -122,8 +169,37 @@ export default function FlightsPage() {
             icon="✈️"
             name="FlightRadar"
             tagline="Fare Intelligence"
-            description="Track prices across airlines, get AI-powered fare predictions, and never overpay for flights again."
+            description="Search real-time flight prices across airlines. Powered by Amadeus API."
           />
+
+          {/* API Status Banner */}
+          {!API_CONFIGURED && (
+            <div className="max-w-5xl mx-auto mb-8">
+              <div className="bg-gold-50 border-2 border-gold-300 rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-3xl">🔑</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gold-900 text-lg mb-2">API Integration Required</h3>
+                    <p className="text-gold-800 mb-4">
+                      FlightRadar uses the Amadeus API for real flight data. To enable this feature:
+                    </p>
+                    <ol className="list-decimal list-inside text-gold-700 space-y-2 mb-4">
+                      <li>Sign up at <a href="https://developers.amadeus.com" target="_blank" rel="noopener noreferrer" className="text-coral-600 hover:underline font-medium">developers.amadeus.com</a> (free)</li>
+                      <li>Create an app to get your API Key and Secret</li>
+                      <li>Add to your <code className="bg-gold-100 px-2 py-0.5 rounded">.env.local</code> file:</li>
+                    </ol>
+                    <pre className="bg-midnight-900 text-green-400 p-4 rounded-xl text-sm overflow-x-auto">
+{`NEXT_PUBLIC_AMADEUS_CLIENT_ID=your_api_key
+NEXT_PUBLIC_AMADEUS_CLIENT_SECRET=your_api_secret`}
+                    </pre>
+                    <p className="text-gold-600 text-sm mt-4">
+                      Free tier includes 2,000 API calls/month — enough to test and launch.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Search Form */}
           <div className="max-w-5xl mx-auto mb-12">
@@ -251,8 +327,8 @@ export default function FlightsPage() {
 
                 <button
                   onClick={handleSearch}
-                  disabled={isSearching}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:shadow-coral-400/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50"
+                  disabled={isSearching || !from || !to}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:shadow-coral-400/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSearching ? (
                     <>
@@ -275,9 +351,18 @@ export default function FlightsPage() {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="max-w-5xl mx-auto mb-8">
+              <div className="bg-coral-50 border border-coral-200 rounded-xl p-4 text-coral-700">
+                {error}
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           {results.length > 0 && (
-            <div className="mb-16 animate-fade-in">
+            <div className="max-w-5xl mx-auto mb-16 animate-fade-in">
               {/* Results Header */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                 <div>
@@ -302,6 +387,12 @@ export default function FlightsPage() {
                 </div>
               </div>
 
+              {/* Live Data Badge */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-2 h-2 bg-teal-500 rounded-full animate-pulse" />
+                <span className="text-sm text-midnight-500">Real-time prices from Amadeus</span>
+              </div>
+
               {/* Flight Cards */}
               <div className="space-y-4">
                 {sortedResults.map((flight) => (
@@ -317,7 +408,7 @@ export default function FlightsPage() {
                         </div>
                         <div>
                           <p className="font-medium text-midnight-900">{flight.airline}</p>
-                          <p className="text-sm text-midnight-500">{flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop`}</p>
+                          <p className="text-sm text-midnight-500">{flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}</p>
                         </div>
                       </div>
 
@@ -342,30 +433,16 @@ export default function FlightsPage() {
                         </div>
                       </div>
 
-                      {/* Price & Prediction */}
+                      {/* Price */}
                       <div className="flex items-center gap-6">
                         <div className="text-right">
-                          <div className="flex items-center gap-2">
-                            <span className="text-3xl font-bold text-midnight-900">${flight.price}</span>
-                            {flight.priceChange === 'down' && (
-                              <span className="text-teal-500">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                                </svg>
-                              </span>
-                            )}
-                            {flight.priceChange === 'up' && (
-                              <span className="text-red-500">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                </svg>
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-midnight-500 mt-1 max-w-[180px]">{flight.prediction}</p>
+                          <span className="text-3xl font-bold text-midnight-900">${Math.round(flight.price)}</span>
+                          <p className="text-sm text-midnight-500">per person</p>
                         </div>
                         <a 
                           href={flight.bookingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="px-6 py-3 bg-coral-500 hover:bg-coral-600 text-white font-medium rounded-xl transition-colors"
                         >
                           Select
@@ -375,48 +452,30 @@ export default function FlightsPage() {
                   </div>
                 ))}
               </div>
-
-              {/* Price Alert CTA */}
-              <div className="mt-8 bg-gradient-to-r from-midnight-900 to-midnight-800 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-coral-500/20 rounded-xl flex items-center justify-center">
-                    <svg className="w-6 h-6 text-coral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Set a Price Alert</p>
-                    <p className="text-midnight-300 text-sm">Get notified when prices drop for this route</p>
-                  </div>
-                </div>
-                <button className="px-6 py-3 bg-white text-midnight-900 font-medium rounded-xl hover:bg-midnight-50 transition-colors">
-                  Create Alert
-                </button>
-              </div>
             </div>
           )}
 
           {/* Info Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <WhyUseCard 
               points={[
-                'Compare prices across all major airlines',
-                'AI-powered fare predictions',
-                'Historical price data for better timing',
-                'Price alerts when fares drop',
+                'Real-time prices from Amadeus API',
+                'Compare across all major airlines',
+                'No markup — see actual fares',
+                'Sort by price, duration, or time',
               ]}
             />
             <HowAICard 
-              description="FlightRadar analyzes millions of fare data points to predict price movements and help you book at the right time."
+              description="FlightRadar connects to Amadeus, the same API that powers travel agencies worldwide."
               capabilities={[
-                'Machine learning price prediction',
-                'Historical trend analysis',
-                'Demand forecasting',
-                'Best booking window detection',
+                'Real-time flight availability',
+                'Accurate pricing from airlines',
+                'Global airline coverage',
+                '2,000 free searches/month',
               ]}
             />
             <QphiQInsight 
-              insight="For domestic US flights, booking 3-4 weeks in advance typically yields the best prices. For international, aim for 2-3 months ahead — but watch for airline sales."
+              insight="For domestic US flights, booking 3-4 weeks in advance typically yields the best prices. For international, aim for 2-3 months ahead."
             />
           </div>
         </div>
