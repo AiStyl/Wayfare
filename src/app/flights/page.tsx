@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
+import AirportAutocomplete from '@/components/AirportAutocomplete';
 
 interface FlightResult {
   id: string;
@@ -85,8 +86,10 @@ const demoFlights: FlightResult[] = [
 ];
 
 export default function FlightsPage() {
-  const [from, setFrom] = useState('SFO');
-  const [to, setTo] = useState('JFK');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [fromDisplay, setFromDisplay] = useState('');
+  const [toDisplay, setToDisplay] = useState('');
   const [departDate, setDepartDate] = useState('2025-02-15');
   const [returnDate, setReturnDate] = useState('2025-02-22');
   const [tripType, setTripType] = useState<'roundtrip' | 'oneway'>('roundtrip');
@@ -153,20 +156,33 @@ export default function FlightsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {/* From */}
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">From</label>
-                  <input
-                    type="text"
-                    value={from}
-                    onChange={(e) => setFrom(e.target.value.toUpperCase())}
+                  <AirportAutocomplete
+                    label="From"
+                    value={fromDisplay}
+                    onChange={(value, airport) => {
+                      if (airport) {
+                        setFrom(airport.code);
+                        setFromDisplay(`${airport.city} (${airport.code})`);
+                      } else {
+                        setFrom(value);
+                        setFromDisplay(value);
+                      }
+                    }}
                     placeholder="City or airport"
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
                   />
                 </div>
 
                 {/* Swap Button */}
                 <div className="hidden lg:flex items-end justify-center pb-3">
                   <button 
-                    onClick={() => { const temp = from; setFrom(to); setTo(temp); }}
+                    onClick={() => { 
+                      const tempCode = from; 
+                      const tempDisplay = fromDisplay;
+                      setFrom(to); 
+                      setFromDisplay(toDisplay);
+                      setTo(tempCode); 
+                      setToDisplay(tempDisplay);
+                    }}
                     className="p-2 bg-midnight-100 hover:bg-coral-100 rounded-full transition-colors"
                   >
                     <svg className="w-5 h-5 text-midnight-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -177,13 +193,19 @@ export default function FlightsPage() {
 
                 {/* To */}
                 <div className="lg:col-span-1">
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">To</label>
-                  <input
-                    type="text"
-                    value={to}
-                    onChange={(e) => setTo(e.target.value.toUpperCase())}
+                  <AirportAutocomplete
+                    label="To"
+                    value={toDisplay}
+                    onChange={(value, airport) => {
+                      if (airport) {
+                        setTo(airport.code);
+                        setToDisplay(`${airport.city} (${airport.code})`);
+                      } else {
+                        setTo(value);
+                        setToDisplay(value);
+                      }
+                    }}
                     placeholder="City or airport"
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
                   />
                 </div>
 
@@ -263,7 +285,7 @@ export default function FlightsPage() {
                     {results.length} flights found
                   </h2>
                   <p className="text-midnight-500">
-                    {from} → {to} · {new Date(departDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {fromDisplay || from} → {toDisplay || to} · {new Date(departDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
