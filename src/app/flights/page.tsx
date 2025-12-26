@@ -63,8 +63,8 @@ export default function FlightsPage() {
     setResults([]);
 
     try {
-      // Get Amadeus access token
-      const tokenResponse = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
+      // Get Amadeus access token (TEST environment)
+      const tokenResponse = await fetch('https://test.api.amadeus.com/v1/security/oauth2/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -98,7 +98,7 @@ export default function FlightsPage() {
       }
 
       const flightResponse = await fetch(
-        `https://api.amadeus.com/v2/shopping/flight-offers?${searchParams}`,
+        `https://test.api.amadeus.com/v2/shopping/flight-offers?${searchParams}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,

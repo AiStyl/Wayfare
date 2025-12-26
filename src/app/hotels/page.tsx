@@ -113,7 +113,7 @@ export default function HotelsPage() {
 
     try {
       // Get Amadeus access token
-      const tokenResponse = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
+      const tokenResponse = await fetch('https://test.api.amadeus.com/v1/security/oauth2/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -141,7 +141,7 @@ export default function HotelsPage() {
       });
 
       const hotelListResponse = await fetch(
-        `https://api.amadeus.com/v1/reference-data/locations/hotels/by-city?${hotelListParams}`,
+        `https://test.api.amadeus.com/v1/reference-data/locations/hotels/by-city?${hotelListParams}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -176,7 +176,7 @@ export default function HotelsPage() {
       });
 
       const offersResponse = await fetch(
-        `https://api.amadeus.com/v3/shopping/hotel-offers?${offersParams}`,
+        `https://test.api.amadeus.com/v3/shopping/hotel-offers?${offersParams}`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
