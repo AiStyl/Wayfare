@@ -144,8 +144,8 @@ export default function Footer() {
       {/* Legal Disclaimer */}
       <div className="border-t border-midnight-800 bg-midnight-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-midnight-500 text-xs text-center leading-relaxed">
-            <strong>Disclaimer:</strong> WAYFARE provides information for general guidance only. 
+          <p className="text-midnight-300 text-sm text-center leading-relaxed">
+            <strong className="text-coral-400">Disclaimer:</strong> WAYFARE provides information for general guidance only. 
             Travel requirements, prices, and availability change frequently. Always verify information with official sources, 
             airlines, hotels, and government websites before making travel decisions. WAYFARE is not responsible for any 
             inaccuracies or changes in third-party data. Financial and visa information is not professional advice — 
