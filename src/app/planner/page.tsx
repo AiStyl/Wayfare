@@ -4,186 +4,183 @@ import { useState } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
+import CityAutocomplete from '@/components/CityAutocomplete';
 
-const sampleTrips = [
-  "7-day romantic getaway in Italy, focusing on wine regions and coastal towns",
-  "10-day family adventure in Japan with a 6-year-old",
-  "5-day budget backpacking trip through Portugal",
-  "2-week road trip across Iceland's Ring Road",
-];
+interface Activity {
+  time: string;
+  title: string;
+  description: string;
+  type: 'attraction' | 'food' | 'activity' | 'transport' | 'free-time' | 'shopping' | 'nature' | 'nightlife';
+  duration: string;
+  cost: string;
+  tip?: string;
+  bookUrl?: string;
+}
 
 interface DayPlan {
   day: number;
-  title: string;
-  location: string;
-  activities: {
-    time: string;
-    activity: string;
-    details: string;
-    cost?: string;
-    bookingLink?: string;
-  }[];
-  accommodation: {
-    name: string;
-    type: string;
-    price: string;
-  };
-  meals: string[];
+  theme: string;
+  activities: Activity[];
 }
 
-interface Itinerary {
-  title: string;
-  duration: string;
-  totalBudget: string;
-  highlights: string[];
-  days: DayPlan[];
-}
+type TravelStyle = 'relaxed' | 'balanced' | 'intensive';
+type Interest = 'culture' | 'food' | 'nature' | 'nightlife' | 'shopping' | 'history' | 'adventure' | 'photography';
 
-export default function TripForgePage() {
-  const [query, setQuery] = useState('');
+// Curated destination data for popular cities
+const destinationData: Record<string, { activities: Activity[]; tips: string[] }> = {
+  'Tokyo': {
+    activities: [
+      { time: '09:00', title: 'Senso-ji Temple', description: 'Tokyo\'s oldest and most famous Buddhist temple in Asakusa', type: 'attraction', duration: '2 hours', cost: 'Free', tip: 'Go early to avoid crowds and explore Nakamise shopping street', bookUrl: 'https://www.viator.com/searchResults/all?text=sensoji+temple' },
+      { time: '12:00', title: 'Tsukiji Outer Market', description: 'Fresh sushi and street food at the famous fish market area', type: 'food', duration: '1.5 hours', cost: '$15-30', tip: 'Try tamagoyaki (Japanese omelet) and fresh sashimi' },
+      { time: '14:00', title: 'teamLab Borderless', description: 'Immersive digital art museum experience', type: 'activity', duration: '3 hours', cost: '$30', tip: 'Book tickets online 2+ weeks ahead', bookUrl: 'https://www.viator.com/searchResults/all?text=teamlab+tokyo' },
+      { time: '18:00', title: 'Shibuya Crossing', description: 'World\'s busiest pedestrian crossing and Hachiko statue', type: 'attraction', duration: '1 hour', cost: 'Free', tip: 'Watch from Starbucks above for aerial view' },
+      { time: '19:30', title: 'Izakaya Dinner', description: 'Traditional Japanese pub experience with small plates', type: 'food', duration: '2 hours', cost: '$30-50', tip: 'Try yakitori, edamame, and sake', bookUrl: 'https://www.viator.com/searchResults/all?text=tokyo+food+tour' },
+      { time: '10:00', title: 'Meiji Shrine', description: 'Serene Shinto shrine in a forested park', type: 'attraction', duration: '1.5 hours', cost: 'Free', tip: 'Walk through the towering torii gates in Yoyogi Park' },
+      { time: '13:00', title: 'Harajuku & Takeshita Street', description: 'Youth fashion and quirky shops', type: 'shopping', duration: '2 hours', cost: 'Varies', tip: 'Try a crepe from one of the many stands' },
+      { time: '16:00', title: 'Shinjuku Gyoen', description: 'Beautiful garden with Japanese, French, and English sections', type: 'nature', duration: '2 hours', cost: '$5', tip: 'Perfect for cherry blossoms in spring' },
+      { time: '19:00', title: 'Golden Gai', description: 'Tiny bars in narrow alleys of Shinjuku', type: 'nightlife', duration: '3 hours', cost: '$20-40', tip: 'Some bars charge a cover fee - check before entering' },
+      { time: '09:00', title: 'Akihabara', description: 'Electronics, anime, and gaming district', type: 'shopping', duration: '3 hours', cost: 'Varies', tip: 'Visit a maid cafe for the full experience' },
+      { time: '14:00', title: 'Tokyo Skytree', description: 'Observation deck with panoramic city views', type: 'attraction', duration: '2 hours', cost: '$20', tip: 'Go near sunset for day and night views', bookUrl: 'https://www.viator.com/searchResults/all?text=tokyo+skytree' },
+      { time: '17:00', title: 'Ramen Dinner', description: 'Authentic Tokyo-style ramen', type: 'food', duration: '1 hour', cost: '$10-15', tip: 'Try Ichiran for solo booth experience' },
+    ],
+    tips: ['Get a Suica/Pasmo card for easy train travel', 'Download Google Maps offline - addresses are confusing', 'Convenience stores (7-Eleven, Lawson) have great food'],
+  },
+  'Paris': {
+    activities: [
+      { time: '09:00', title: 'Eiffel Tower', description: 'Iconic iron lattice tower with city views', type: 'attraction', duration: '2-3 hours', cost: '$30', tip: 'Book skip-the-line tickets online', bookUrl: 'https://www.viator.com/searchResults/all?text=eiffel+tower+tickets' },
+      { time: '13:00', title: 'Café Lunch in Saint-Germain', description: 'Classic French café experience', type: 'food', duration: '1.5 hours', cost: '$20-35', tip: 'Try croque monsieur and café crème' },
+      { time: '15:00', title: 'Louvre Museum', description: 'World\'s largest art museum - Mona Lisa, Venus de Milo', type: 'attraction', duration: '3-4 hours', cost: '$20', tip: 'Enter through Porte des Lions for shorter queues', bookUrl: 'https://www.viator.com/searchResults/all?text=louvre+skip+line' },
+      { time: '19:30', title: 'Seine River Cruise', description: 'Evening boat tour past illuminated monuments', type: 'activity', duration: '1 hour', cost: '$15-25', tip: 'Book a dinner cruise for special occasions', bookUrl: 'https://www.viator.com/searchResults/all?text=paris+seine+cruise' },
+      { time: '09:30', title: 'Montmartre & Sacré-Cœur', description: 'Artistic hilltop neighborhood with stunning basilica', type: 'attraction', duration: '3 hours', cost: 'Free', tip: 'Walk up the stairs for exercise or take the funicular' },
+      { time: '13:00', title: 'Le Marais Walking', description: 'Trendy neighborhood with shops, falafel, and history', type: 'activity', duration: '2 hours', cost: 'Free', tip: 'Best falafel at L\'As du Fallafel on Rue des Rosiers' },
+      { time: '16:00', title: 'Musée d\'Orsay', description: 'Impressionist art in a stunning former railway station', type: 'attraction', duration: '2-3 hours', cost: '$16', tip: 'Free first Sunday of month', bookUrl: 'https://www.viator.com/searchResults/all?text=orsay+museum' },
+      { time: '20:00', title: 'Dinner in Latin Quarter', description: 'Traditional French bistro experience', type: 'food', duration: '2 hours', cost: '$40-60', tip: 'Try duck confit or boeuf bourguignon' },
+      { time: '10:00', title: 'Palace of Versailles', description: 'Opulent royal château with stunning gardens', type: 'attraction', duration: '5-6 hours', cost: '$20', tip: 'Go on weekdays - extremely crowded on weekends', bookUrl: 'https://www.viator.com/searchResults/all?text=versailles+day+trip' },
+      { time: '19:00', title: 'Champs-Élysées & Arc de Triomphe', description: 'Famous avenue and monument', type: 'attraction', duration: '2 hours', cost: '$15 for Arc', tip: 'Climb the Arc for amazing sunset views' },
+    ],
+    tips: ['Learn basic French phrases - locals appreciate the effort', 'Museums are free on first Sundays', 'Tipping is included in prices but small extra is appreciated'],
+  },
+  'New York': {
+    activities: [
+      { time: '08:00', title: 'Central Park Morning', description: 'Iconic urban park - Bethesda Fountain, Bow Bridge', type: 'nature', duration: '2 hours', cost: 'Free', tip: 'Rent a bike to cover more ground' },
+      { time: '10:30', title: 'Metropolitan Museum of Art', description: 'One of the world\'s greatest art museums', type: 'attraction', duration: '3 hours', cost: '$30 (suggested)', tip: 'Focus on 2-3 sections - it\'s massive', bookUrl: 'https://www.viator.com/searchResults/all?text=met+museum+tour' },
+      { time: '14:00', title: 'Times Square & Broadway', description: 'Bright lights and theater district', type: 'attraction', duration: '1 hour', cost: 'Free', tip: 'Book Broadway show tickets at TKTS booth for discounts', bookUrl: 'https://www.viator.com/searchResults/all?text=broadway+tickets' },
+      { time: '16:00', title: 'High Line Walk', description: 'Elevated park on former railway tracks', type: 'nature', duration: '1.5 hours', cost: 'Free', tip: 'Enter at 14th St and walk to Hudson Yards' },
+      { time: '19:00', title: 'Dinner in Chelsea Market', description: 'Food hall with diverse options', type: 'food', duration: '1.5 hours', cost: '$20-40', tip: 'Try Los Tacos No.1 or The Lobster Place' },
+      { time: '09:00', title: 'Statue of Liberty & Ellis Island', description: 'Iconic symbol of freedom', type: 'attraction', duration: '4-5 hours', cost: '$24', tip: 'Book crown access months ahead if interested', bookUrl: 'https://www.viator.com/searchResults/all?text=statue+liberty+ferry' },
+      { time: '15:00', title: 'Brooklyn Bridge Walk', description: 'Historic bridge with Manhattan skyline views', type: 'attraction', duration: '1 hour', cost: 'Free', tip: 'Walk from Brooklyn to Manhattan for best views' },
+      { time: '17:00', title: 'DUMBO Brooklyn', description: 'Trendy neighborhood with iconic bridge view', type: 'activity', duration: '2 hours', cost: 'Free', tip: 'Get the classic photo at Washington St' },
+      { time: '20:00', title: 'Pizza in Brooklyn', description: 'NYC-style pizza experience', type: 'food', duration: '1 hour', cost: '$15-25', tip: 'Try Juliana\'s or Grimaldi\'s' },
+      { time: '10:00', title: '9/11 Memorial & Museum', description: 'Moving tribute to September 11 victims', type: 'attraction', duration: '2-3 hours', cost: '$33', tip: 'Memorial is free, museum requires ticket', bookUrl: 'https://www.viator.com/searchResults/all?text=911+memorial+museum' },
+      { time: '14:00', title: 'One World Observatory', description: 'Views from tallest building in Western Hemisphere', type: 'attraction', duration: '1.5 hours', cost: '$43', tip: 'Go near sunset for best experience', bookUrl: 'https://www.viator.com/searchResults/all?text=one+world+observatory' },
+    ],
+    tips: ['Get an OMNY or MetroCard for subway', 'Walk when possible - many attractions are close', 'Tip 18-20% at restaurants'],
+  },
+};
+
+// Generic activities for cities not in database
+const genericActivities: Activity[] = [
+  { time: '09:00', title: 'City Walking Tour', description: 'Explore the historic center and main landmarks', type: 'activity', duration: '3 hours', cost: 'Free-$30', tip: 'Join a free walking tour and tip at the end', bookUrl: 'https://www.viator.com/searchResults/all?text=walking+tour' },
+  { time: '12:30', title: 'Local Lunch', description: 'Try regional specialties at a local restaurant', type: 'food', duration: '1.5 hours', cost: '$15-30', tip: 'Ask locals for recommendations' },
+  { time: '14:30', title: 'Main Museum or Attraction', description: 'Visit the city\'s most famous museum or landmark', type: 'attraction', duration: '2-3 hours', cost: '$10-25', tip: 'Book tickets online to skip lines' },
+  { time: '18:00', title: 'Sunset Viewpoint', description: 'Find a rooftop or viewpoint for sunset', type: 'activity', duration: '1 hour', cost: 'Free-$15', tip: 'Check Google Maps for "viewpoint" near you' },
+  { time: '19:30', title: 'Dinner Experience', description: 'Evening meal at a well-reviewed local spot', type: 'food', duration: '2 hours', cost: '$25-50', tip: 'Make reservations for popular places' },
+  { time: '10:00', title: 'Neighborhood Exploration', description: 'Wander through a local neighborhood', type: 'activity', duration: '2 hours', cost: 'Free', tip: 'Get lost - best discoveries happen by accident' },
+  { time: '14:00', title: 'Local Market', description: 'Browse local markets for food and crafts', type: 'shopping', duration: '2 hours', cost: 'Varies', tip: 'Great for souvenirs and local products' },
+  { time: '17:00', title: 'Park or Garden', description: 'Relax in a local park or botanical garden', type: 'nature', duration: '1.5 hours', cost: 'Free-$10', tip: 'Perfect for people-watching' },
+];
+
+export default function PlannerPage() {
+  const [destination, setDestination] = useState('');
+  const [duration, setDuration] = useState(3);
+  const [travelStyle, setTravelStyle] = useState<TravelStyle>('balanced');
+  const [interests, setInterests] = useState<Interest[]>(['culture', 'food']);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
-  const [activeDay, setActiveDay] = useState(0);
+  const [itinerary, setItinerary] = useState<DayPlan[] | null>(null);
 
-  const handleGenerate = async () => {
-    if (!query.trim()) return;
-    
+  const toggleInterest = (interest: Interest) => {
+    setInterests(prev =>
+      prev.includes(interest)
+        ? prev.filter(i => i !== interest)
+        : [...prev, interest]
+    );
+  };
+
+  const generateItinerary = async () => {
+    if (!destination) return;
+
     setIsGenerating(true);
     
-    // Simulate API call with demo data
-    await new Promise(resolve => setTimeout(resolve, 2500));
+    // Simulate AI processing
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Get city data or use generic
+    const cityKey = Object.keys(destinationData).find(
+      key => destination.toLowerCase().includes(key.toLowerCase())
+    );
     
-    // Demo itinerary based on query
-    const demoItinerary: Itinerary = {
-      title: query.includes('Italy') ? 'Romantic Italian Escape' : 
-             query.includes('Japan') ? 'Family Adventure in Japan' :
-             query.includes('Portugal') ? 'Portugal Budget Explorer' :
-             'Your Custom Adventure',
-      duration: query.match(/(\d+)[\s-]*(day|week)/i)?.[0] || '7 days',
-      totalBudget: query.toLowerCase().includes('budget') ? '$1,200 - $1,800' : 
-                   query.toLowerCase().includes('luxury') ? '$5,000 - $8,000' :
-                   '$2,500 - $3,500',
-      highlights: [
-        'Curated local experiences',
-        'Optimal route planning',
-        'Mix of iconic sites and hidden gems',
-        'Restaurant recommendations from locals',
-      ],
-      days: [
-        {
-          day: 1,
-          title: 'Arrival & City Exploration',
-          location: 'Rome, Italy',
-          activities: [
-            {
-              time: '2:00 PM',
-              activity: 'Airport Arrival & Hotel Check-in',
-              details: 'Private transfer from FCO to city center',
-              cost: '$45',
-            },
-            {
-              time: '4:00 PM',
-              activity: 'Trastevere Neighborhood Walk',
-              details: 'Wander cobblestone streets, visit Santa Maria church',
-              cost: 'Free',
-            },
-            {
-              time: '7:30 PM',
-              activity: 'Welcome Dinner at Da Enzo',
-              details: 'Authentic Roman cuisine, reservations recommended',
-              cost: '$60-80',
-              bookingLink: '#',
-            },
-          ],
-          accommodation: {
-            name: 'Hotel Campo de\' Fiori',
-            type: 'Boutique Hotel',
-            price: '$180/night',
-          },
-          meals: ['Dinner at Da Enzo al 29 (Roman classics)'],
-        },
-        {
-          day: 2,
-          title: 'Ancient Rome',
-          location: 'Rome, Italy',
-          activities: [
-            {
-              time: '8:30 AM',
-              activity: 'Colosseum & Roman Forum',
-              details: 'Skip-the-line guided tour, arena floor access',
-              cost: '$65',
-              bookingLink: '#',
-            },
-            {
-              time: '1:00 PM',
-              activity: 'Lunch at Roscioli',
-              details: 'Famous deli and restaurant',
-              cost: '$35-45',
-            },
-            {
-              time: '3:00 PM',
-              activity: 'Palatine Hill & Circus Maximus',
-              details: 'Self-guided exploration',
-              cost: 'Included with morning ticket',
-            },
-            {
-              time: '6:00 PM',
-              activity: 'Sunset Aperitivo',
-              details: 'Rooftop drinks near Piazza Navona',
-              cost: '$20',
-            },
-          ],
-          accommodation: {
-            name: 'Hotel Campo de\' Fiori',
-            type: 'Boutique Hotel',
-            price: '$180/night',
-          },
-          meals: ['Breakfast at hotel', 'Lunch at Roscioli', 'Dinner at leisure'],
-        },
-        {
-          day: 3,
-          title: 'Vatican & Art',
-          location: 'Rome → Tuscany',
-          activities: [
-            {
-              time: '8:00 AM',
-              activity: 'Vatican Museums & Sistine Chapel',
-              details: 'Early entry tour before crowds',
-              cost: '$85',
-              bookingLink: '#',
-            },
-            {
-              time: '12:00 PM',
-              activity: 'St. Peter\'s Basilica',
-              details: 'Optional dome climb for panoramic views',
-              cost: 'Free (dome: $10)',
-            },
-            {
-              time: '3:00 PM',
-              activity: 'Train to Florence',
-              details: 'High-speed Frecciarossa, 1.5 hours',
-              cost: '$45',
-              bookingLink: '#',
-            },
-            {
-              time: '6:00 PM',
-              activity: 'Florence Arrival & Evening Stroll',
-              details: 'Walk across Ponte Vecchio at sunset',
-              cost: 'Free',
-            },
-          ],
-          accommodation: {
-            name: 'Hotel Davanzati',
-            type: 'Historic Hotel',
-            price: '$200/night',
-          },
-          meals: ['Early breakfast', 'Light lunch near Vatican', 'Florentine dinner'],
-        },
-      ],
-    };
+    const cityData = cityKey ? destinationData[cityKey] : null;
+    const activities = cityData?.activities || genericActivities;
+
+    // Generate day plans
+    const days: DayPlan[] = [];
+    const themes = ['Iconic Highlights', 'Local Favorites', 'Hidden Gems', 'Cultural Deep Dive', 'Relaxation Day', 'Adventure Day', 'Food & Markets'];
     
-    setItinerary(demoItinerary);
+    // Activities per day based on travel style
+    const activitiesPerDay = travelStyle === 'relaxed' ? 3 : travelStyle === 'balanced' ? 5 : 7;
+    
+    let activityIndex = 0;
+    for (let day = 1; day <= duration; day++) {
+      const dayActivities: Activity[] = [];
+      
+      for (let i = 0; i < activitiesPerDay && activityIndex < activities.length; i++) {
+        dayActivities.push(activities[activityIndex % activities.length]);
+        activityIndex++;
+      }
+      
+      // Add free time for relaxed style
+      if (travelStyle === 'relaxed' && dayActivities.length > 0) {
+        dayActivities.push({
+          time: '15:00',
+          title: 'Free Time',
+          description: 'Explore on your own or rest at your hotel',
+          type: 'free-time',
+          duration: '2-3 hours',
+          cost: 'Free',
+        });
+      }
+
+      days.push({
+        day,
+        theme: themes[(day - 1) % themes.length],
+        activities: dayActivities,
+      });
+    }
+
+    setItinerary(days);
     setIsGenerating(false);
+  };
+
+  const interestOptions: { id: Interest; label: string; icon: string }[] = [
+    { id: 'culture', label: 'Culture', icon: '🎭' },
+    { id: 'food', label: 'Food', icon: '🍜' },
+    { id: 'nature', label: 'Nature', icon: '🌿' },
+    { id: 'nightlife', label: 'Nightlife', icon: '🌙' },
+    { id: 'shopping', label: 'Shopping', icon: '🛍️' },
+    { id: 'history', label: 'History', icon: '🏛️' },
+    { id: 'adventure', label: 'Adventure', icon: '🧗' },
+    { id: 'photography', label: 'Photography', icon: '📸' },
+  ];
+
+  const activityTypeIcons: Record<string, string> = {
+    'attraction': '📍',
+    'food': '🍽️',
+    'activity': '🎯',
+    'transport': '🚇',
+    'free-time': '☕',
+    'nature': '🌳',
+    'shopping': '🛒',
+    'nightlife': '🌙',
   };
 
   return (
@@ -196,40 +193,99 @@ export default function TripForgePage() {
           <ToolPageHeader 
             icon="🗺️"
             name="TripForge"
-            tagline="AI Itinerary Builder"
-            description="Describe your dream trip in plain English and get a complete, day-by-day itinerary with activities, restaurants, and booking links."
+            tagline="AI Trip Planner"
+            description="Get a personalized day-by-day itinerary crafted for your travel style and interests."
           />
 
-          {/* Main Input Area */}
-          <div className="max-w-4xl mx-auto mb-16">
-            <div className="bg-white rounded-3xl shadow-elevated p-8 border border-midnight-100">
-              <label className="block text-lg font-display font-medium text-midnight-900 mb-4">
-                Describe your ideal trip
-              </label>
-              <textarea
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g., 7-day romantic getaway in Italy focusing on wine regions and coastal towns, mid-range budget, visiting in October..."
-                className="w-full h-32 px-6 py-4 bg-midnight-50 border border-midnight-200 rounded-2xl text-midnight-900 placeholder:text-midnight-400 focus:outline-none focus:border-coral-400 focus:ring-4 focus:ring-coral-400/20 transition-all duration-200 resize-none text-lg"
-              />
-              
-              {/* Sample prompts */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {sampleTrips.map((trip, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setQuery(trip)}
-                    className="px-4 py-2 bg-midnight-50 hover:bg-coral-50 text-midnight-600 hover:text-coral-600 text-sm rounded-full transition-colors"
-                  >
-                    {trip.slice(0, 40)}...
-                  </button>
-                ))}
+          {/* Planner Form */}
+          <div className="max-w-3xl mx-auto mb-12">
+            <div className="bg-white rounded-3xl shadow-elevated p-6 md:p-8 border border-midnight-100">
+              {/* Destination */}
+              <div className="mb-6">
+                <CityAutocomplete
+                  label="Where are you going?"
+                  value={destination}
+                  onChange={(value) => setDestination(value)}
+                  placeholder="Enter destination city"
+                />
               </div>
 
+              {/* Duration */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-midnight-600 mb-3">
+                  How many days?
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="14"
+                    value={duration}
+                    onChange={(e) => setDuration(Number(e.target.value))}
+                    className="flex-1 h-2 bg-midnight-100 rounded-lg appearance-none cursor-pointer accent-coral-500"
+                  />
+                  <span className="w-16 text-center font-semibold text-midnight-900 bg-midnight-50 px-3 py-2 rounded-lg">
+                    {duration} {duration === 1 ? 'day' : 'days'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Travel Style */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-midnight-600 mb-3">
+                  Travel pace
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { id: 'relaxed', label: 'Relaxed', desc: '3-4 activities/day', icon: '🧘' },
+                    { id: 'balanced', label: 'Balanced', desc: '5-6 activities/day', icon: '⚖️' },
+                    { id: 'intensive', label: 'Packed', desc: '7+ activities/day', icon: '🏃' },
+                  ] as const).map(style => (
+                    <button
+                      key={style.id}
+                      onClick={() => setTravelStyle(style.id)}
+                      className={`p-4 rounded-xl border-2 transition-all text-center ${
+                        travelStyle === style.id
+                          ? 'border-coral-400 bg-coral-50'
+                          : 'border-midnight-200 hover:border-coral-300'
+                      }`}
+                    >
+                      <span className="text-2xl block mb-1">{style.icon}</span>
+                      <span className="font-medium text-midnight-900 block">{style.label}</span>
+                      <span className="text-xs text-midnight-500">{style.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Interests */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-midnight-600 mb-3">
+                  Your interests (select all that apply)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {interestOptions.map(interest => (
+                    <button
+                      key={interest.id}
+                      onClick={() => toggleInterest(interest.id)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                        interests.includes(interest.id)
+                          ? 'bg-coral-500 text-white'
+                          : 'bg-midnight-50 text-midnight-600 hover:bg-coral-50'
+                      }`}
+                    >
+                      <span>{interest.icon}</span>
+                      {interest.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate Button */}
               <button
-                onClick={handleGenerate}
-                disabled={!query.trim() || isGenerating}
-                className="mt-6 w-full inline-flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:shadow-coral-400/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                onClick={generateItinerary}
+                disabled={!destination || isGenerating}
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isGenerating ? (
                   <>
@@ -237,14 +293,11 @@ export default function TripForgePage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Crafting Your Perfect Itinerary...
+                    Creating your itinerary...
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Generate Itinerary
+                    ✨ Generate Itinerary
                   </>
                 )}
               </button>
@@ -253,183 +306,142 @@ export default function TripForgePage() {
 
           {/* Generated Itinerary */}
           {itinerary && (
-            <div className="mb-16 animate-fade-in">
+            <div className="max-w-4xl mx-auto mb-16 animate-fade-in">
               {/* Itinerary Header */}
-              <div className="bg-gradient-to-br from-midnight-900 to-midnight-800 rounded-3xl p-8 md:p-12 text-white mb-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div>
-                    <h2 className="text-3xl md:text-4xl font-display font-semibold mb-2">
-                      {itinerary.title}
-                    </h2>
-                    <div className="flex flex-wrap items-center gap-4 text-midnight-300">
-                      <span className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        {itinerary.duration}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Est. {itinerary.totalBudget}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition-colors">
-                      Export PDF
-                    </button>
-                    <button className="px-6 py-3 bg-coral-500 hover:bg-coral-600 rounded-xl font-medium transition-colors">
-                      Save Trip
-                    </button>
-                  </div>
-                </div>
-
-                {/* Highlights */}
-                <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {itinerary.highlights.map((highlight, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm text-midnight-200">
-                      <svg className="w-4 h-4 text-coral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {highlight}
-                    </div>
-                  ))}
-                </div>
+              <div className="bg-gradient-to-r from-coral-500 to-gold-500 rounded-2xl p-6 text-white mb-6">
+                <h2 className="text-2xl font-display font-semibold mb-2">
+                  Your {destination} Itinerary
+                </h2>
+                <p className="opacity-90">
+                  {duration} {duration === 1 ? 'day' : 'days'} · {travelStyle} pace · {interests.length} interests
+                </p>
               </div>
 
-              {/* Day Navigation */}
-              <div className="flex gap-2 overflow-x-auto pb-4 mb-8 no-scrollbar">
-                {itinerary.days.map((day, i) => (
-                  <button
-                    key={day.day}
-                    onClick={() => setActiveDay(i)}
-                    className={`flex-shrink-0 px-6 py-3 rounded-xl font-medium transition-all ${
-                      activeDay === i 
-                        ? 'bg-coral-500 text-white shadow-lg shadow-coral-400/25' 
-                        : 'bg-white text-midnight-600 hover:bg-coral-50 border border-midnight-100'
-                    }`}
-                  >
-                    Day {day.day}
-                  </button>
+              {/* Day Cards */}
+              <div className="space-y-6">
+                {itinerary.map(day => (
+                  <div key={day.day} className="bg-white rounded-2xl border border-midnight-100 overflow-hidden">
+                    {/* Day Header */}
+                    <div className="px-6 py-4 bg-midnight-50 border-b border-midnight-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-midnight-900 text-lg">Day {day.day}</h3>
+                          <p className="text-sm text-midnight-500">{day.theme}</p>
+                        </div>
+                        <span className="px-3 py-1 bg-coral-100 text-coral-700 text-sm font-medium rounded-full">
+                          {day.activities.length} activities
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Activities */}
+                    <div className="divide-y divide-midnight-100">
+                      {day.activities.map((activity, idx) => (
+                        <div key={idx} className="px-6 py-4">
+                          <div className="flex items-start gap-4">
+                            <div className="text-center">
+                              <span className="text-2xl">{activityTypeIcons[activity.type] || '📍'}</span>
+                              <p className="text-xs text-midnight-400 mt-1">{activity.time}</p>
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-midnight-900">{activity.title}</h4>
+                              <p className="text-sm text-midnight-600 mt-1">{activity.description}</p>
+                              <div className="flex flex-wrap gap-3 mt-2">
+                                <span className="text-xs text-midnight-500">⏱️ {activity.duration}</span>
+                                <span className="text-xs text-midnight-500">💰 {activity.cost}</span>
+                              </div>
+                              {activity.tip && (
+                                <p className="text-sm text-teal-600 mt-2">💡 {activity.tip}</p>
+                              )}
+                            </div>
+                            {activity.bookUrl && (
+                              <a
+                                href={activity.bookUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3 py-1.5 text-sm bg-coral-100 hover:bg-coral-200 text-coral-700 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                Book →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
 
-              {/* Day Details */}
-              {itinerary.days[activeDay] && (
-                <div className="grid lg:grid-cols-3 gap-8">
-                  {/* Activities */}
-                  <div className="lg:col-span-2">
-                    <div className="bg-white rounded-2xl border border-midnight-100 overflow-hidden">
-                      <div className="px-6 py-4 bg-midnight-50 border-b border-midnight-100">
-                        <h3 className="text-xl font-display font-semibold text-midnight-900">
-                          {itinerary.days[activeDay].title}
-                        </h3>
-                        <p className="text-midnight-500 mt-1">
-                          📍 {itinerary.days[activeDay].location}
-                        </p>
-                      </div>
-                      <div className="p-6">
-                        <div className="space-y-6">
-                          {itinerary.days[activeDay].activities.map((activity, i) => (
-                            <div key={i} className="flex gap-4">
-                              <div className="flex-shrink-0 w-20 text-sm font-medium text-coral-500">
-                                {activity.time}
-                              </div>
-                              <div className="flex-1 pb-6 border-b border-midnight-100 last:border-0 last:pb-0">
-                                <h4 className="font-medium text-midnight-900 mb-1">
-                                  {activity.activity}
-                                </h4>
-                                <p className="text-midnight-500 text-sm mb-2">
-                                  {activity.details}
-                                </p>
-                                <div className="flex items-center gap-4">
-                                  {activity.cost && (
-                                    <span className="text-sm text-teal-600 font-medium">
-                                      {activity.cost}
-                                    </span>
-                                  )}
-                                  {activity.bookingLink && (
-                                    <a href={activity.bookingLink} className="text-sm text-coral-500 hover:text-coral-600 font-medium">
-                                      Book Now →
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              {/* Action Buttons */}
+              <div className="mt-6 flex flex-wrap gap-4 justify-center">
+                <button
+                  onClick={() => window.print()}
+                  className="px-6 py-3 bg-midnight-100 hover:bg-midnight-200 text-midnight-700 font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  🖨️ Print Itinerary
+                </button>
+                <a
+                  href={`https://www.viator.com/searchResults/all?text=${encodeURIComponent(destination + ' tours')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 bg-coral-500 hover:bg-coral-600 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  🎫 Book Tours & Activities
+                </a>
+              </div>
 
-                  {/* Sidebar */}
-                  <div className="space-y-6">
-                    {/* Accommodation */}
-                    <div className="bg-white rounded-2xl border border-midnight-100 p-6">
-                      <h4 className="font-display font-medium text-midnight-900 mb-4 flex items-center gap-2">
-                        <span className="text-xl">🏨</span>
-                        Accommodation
-                      </h4>
-                      <div className="space-y-2">
-                        <p className="font-medium text-midnight-900">
-                          {itinerary.days[activeDay].accommodation.name}
-                        </p>
-                        <p className="text-sm text-midnight-500">
-                          {itinerary.days[activeDay].accommodation.type}
-                        </p>
-                        <p className="text-coral-500 font-medium">
-                          {itinerary.days[activeDay].accommodation.price}
-                        </p>
-                        <button className="mt-2 w-full py-2 px-4 bg-midnight-900 hover:bg-midnight-800 text-white text-sm font-medium rounded-lg transition-colors">
-                          Check Availability
-                        </button>
-                      </div>
-                    </div>
+              {/* Affiliate Disclosure */}
+              <p className="text-xs text-midnight-400 text-center mt-4">
+                Booking links go to Viator. WAYFARE may earn a commission on bookings.
+              </p>
+            </div>
+          )}
 
-                    {/* Meals */}
-                    <div className="bg-white rounded-2xl border border-midnight-100 p-6">
-                      <h4 className="font-display font-medium text-midnight-900 mb-4 flex items-center gap-2">
-                        <span className="text-xl">🍽️</span>
-                        Recommended Meals
-                      </h4>
-                      <ul className="space-y-2">
-                        {itinerary.days[activeDay].meals.map((meal, i) => (
-                          <li key={i} className="text-sm text-midnight-600 flex items-start gap-2">
-                            <span className="text-coral-400">•</span>
-                            {meal}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
+          {/* Popular Destinations */}
+          {!itinerary && (
+            <div className="max-w-4xl mx-auto mb-12">
+              <h3 className="text-xl font-display font-semibold text-midnight-900 mb-6 text-center">
+                Popular Destinations
+              </h3>
+              <div className="grid md:grid-cols-3 gap-4">
+                {['Tokyo', 'Paris', 'New York', 'Barcelona', 'Bali', 'London'].map(city => (
+                  <button
+                    key={city}
+                    onClick={() => setDestination(city)}
+                    className="bg-white rounded-xl border border-midnight-100 p-4 hover:shadow-card-hover hover:border-coral-200 transition-all text-left"
+                  >
+                    <span className="text-2xl mb-2 block">
+                      {city === 'Tokyo' ? '🗼' : city === 'Paris' ? '🗼' : city === 'New York' ? '🗽' : city === 'Barcelona' ? '🏰' : city === 'Bali' ? '🏝️' : '🎡'}
+                    </span>
+                    <p className="font-medium text-midnight-900">{city}</p>
+                    <p className="text-sm text-midnight-500">View itinerary →</p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Info Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <WhyUseCard 
               points={[
-                'Save hours of trip planning research',
-                'Get optimized routes between attractions',
-                'Discover local favorites and hidden gems',
-                'One-click booking links for everything',
+                'Personalized to your interests',
+                'Adjustable travel pace',
+                'Local tips included',
+                'Book tours directly',
               ]}
             />
             <HowAICard 
-              description="TripForge uses AI to understand your travel style, preferences, and constraints to build personalized itineraries."
+              description="TripForge creates itineraries based on curated destination data, optimized for your travel style and interests."
               capabilities={[
-                'Natural language understanding',
-                'Route optimization algorithms',
-                'Real-time availability checking',
-                'Budget-aware recommendations',
+                'Day-by-day planning',
+                'Time estimates',
+                'Cost estimates',
+                'Insider tips',
               ]}
             />
             <QphiQInsight 
-              insight="For romantic Italy trips, consider visiting Cinque Terre in shoulder season (late September) — fewer crowds, mild weather, and the grape harvest makes for beautiful scenery."
+              insight="Don't over-plan! Leave buffer time for spontaneous discoveries. The best travel moments often aren't on any itinerary."
             />
           </div>
         </div>
