@@ -600,7 +600,7 @@ export default function PointsPage() {
                       <span className="text-sm text-midnight-500 ml-1">{card.rating}</span>
                     </div>
                     <a
-                      href={card.affiliateUrl}
+                      href={card.applyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.02] transition-all"
@@ -686,7 +686,7 @@ export default function PointsPage() {
                         {compareCards.map(card => (
                           <td key={card.id} className="p-3">
                             <a
-                              href={card.affiliateUrl}
+                              href={card.applyUrl}
                               className="inline-block px-4 py-2 bg-coral-500 text-white font-medium rounded-lg hover:bg-coral-600 transition-colors text-sm"
                             >
                               Apply Now
