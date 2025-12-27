@@ -1,151 +1,198 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Nav from '@/components/Nav';
 import Footer from '@/components/Footer';
 import { WhyUseCard, HowAICard, QphiQInsight, ToolPageHeader } from '@/components/InfoCards';
 
 interface PackingItem {
+  id: string;
   name: string;
-  quantity: number;
   category: string;
   essential: boolean;
-  packed: boolean;
+  quantity: number;
+  shopUrl?: string;
+  shopName?: string;
 }
 
-interface PackingList {
-  destination: string;
-  weather: string;
-  temperature: string;
-  categories: {
-    name: string;
-    icon: string;
-    items: PackingItem[];
-  }[];
-}
+type TripType = 'beach' | 'city' | 'adventure' | 'business' | 'winter' | 'backpacking';
+type Climate = 'tropical' | 'temperate' | 'cold' | 'desert';
+type Duration = '1-3' | '4-7' | '8-14' | '15+';
+
+// Base packing items by category
+const baseItems: Record<string, PackingItem[]> = {
+  essentials: [
+    { id: 'passport', name: 'Passport', category: 'Documents', essential: true, quantity: 1 },
+    { id: 'id', name: 'ID / Driver\'s License', category: 'Documents', essential: true, quantity: 1 },
+    { id: 'credit-cards', name: 'Credit/Debit Cards', category: 'Documents', essential: true, quantity: 2 },
+    { id: 'cash', name: 'Cash (local currency)', category: 'Documents', essential: true, quantity: 1 },
+    { id: 'phone', name: 'Phone + Charger', category: 'Electronics', essential: true, quantity: 1 },
+    { id: 'medications', name: 'Prescription Medications', category: 'Health', essential: true, quantity: 1 },
+    { id: 'insurance-card', name: 'Travel Insurance Card', category: 'Documents', essential: true, quantity: 1 },
+  ],
+  clothing: [
+    { id: 'underwear', name: 'Underwear', category: 'Clothing', essential: true, quantity: 5 },
+    { id: 'socks', name: 'Socks', category: 'Clothing', essential: true, quantity: 5 },
+    { id: 'tshirts', name: 'T-shirts / Tops', category: 'Clothing', essential: true, quantity: 4 },
+    { id: 'pants', name: 'Pants / Shorts', category: 'Clothing', essential: true, quantity: 2 },
+    { id: 'sleepwear', name: 'Sleepwear', category: 'Clothing', essential: false, quantity: 1 },
+  ],
+  toiletries: [
+    { id: 'toothbrush', name: 'Toothbrush + Toothpaste', category: 'Toiletries', essential: true, quantity: 1 },
+    { id: 'deodorant', name: 'Deodorant', category: 'Toiletries', essential: true, quantity: 1 },
+    { id: 'shampoo', name: 'Shampoo / Conditioner', category: 'Toiletries', essential: false, quantity: 1 },
+    { id: 'sunscreen', name: 'Sunscreen', category: 'Toiletries', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+sunscreen', shopName: 'Amazon' },
+    { id: 'razor', name: 'Razor / Shaving Kit', category: 'Toiletries', essential: false, quantity: 1 },
+  ],
+  electronics: [
+    { id: 'power-bank', name: 'Power Bank', category: 'Electronics', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+power+bank', shopName: 'Amazon' },
+    { id: 'adapter', name: 'Universal Power Adapter', category: 'Electronics', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=universal+travel+adapter', shopName: 'Amazon' },
+    { id: 'headphones', name: 'Headphones / Earbuds', category: 'Electronics', essential: false, quantity: 1 },
+    { id: 'camera', name: 'Camera', category: 'Electronics', essential: false, quantity: 1 },
+  ],
+};
+
+// Trip-type specific items
+const tripTypeItems: Record<TripType, PackingItem[]> = {
+  beach: [
+    { id: 'swimsuit', name: 'Swimsuit', category: 'Beach', essential: true, quantity: 2 },
+    { id: 'flip-flops', name: 'Flip Flops / Sandals', category: 'Beach', essential: true, quantity: 1 },
+    { id: 'beach-towel', name: 'Beach Towel', category: 'Beach', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=quick+dry+travel+towel', shopName: 'Amazon' },
+    { id: 'sunglasses', name: 'Sunglasses', category: 'Beach', essential: true, quantity: 1 },
+    { id: 'sun-hat', name: 'Sun Hat', category: 'Beach', essential: false, quantity: 1 },
+    { id: 'aloe', name: 'Aloe Vera Gel', category: 'Beach', essential: false, quantity: 1 },
+    { id: 'waterproof-bag', name: 'Waterproof Phone Pouch', category: 'Beach', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=waterproof+phone+pouch', shopName: 'Amazon' },
+    { id: 'reef-safe-sunscreen', name: 'Reef-Safe Sunscreen', category: 'Beach', essential: true, quantity: 1 },
+  ],
+  city: [
+    { id: 'walking-shoes', name: 'Comfortable Walking Shoes', category: 'City', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=comfortable+walking+shoes+travel', shopName: 'Amazon' },
+    { id: 'day-bag', name: 'Day Bag / Crossbody', category: 'City', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=anti+theft+travel+bag', shopName: 'Amazon' },
+    { id: 'smart-casual', name: 'Smart Casual Outfit', category: 'City', essential: false, quantity: 1 },
+    { id: 'umbrella', name: 'Compact Umbrella', category: 'City', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=compact+travel+umbrella', shopName: 'Amazon' },
+    { id: 'guidebook', name: 'City Map / Guidebook', category: 'City', essential: false, quantity: 1 },
+    { id: 'light-jacket', name: 'Light Jacket / Cardigan', category: 'City', essential: true, quantity: 1 },
+  ],
+  adventure: [
+    { id: 'hiking-boots', name: 'Hiking Boots', category: 'Adventure', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=hiking+boots', shopName: 'Amazon' },
+    { id: 'hiking-pants', name: 'Quick-Dry Pants', category: 'Adventure', essential: true, quantity: 2 },
+    { id: 'backpack', name: 'Daypack (20-30L)', category: 'Adventure', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=hiking+daypack', shopName: 'Amazon' },
+    { id: 'water-bottle', name: 'Reusable Water Bottle', category: 'Adventure', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=insulated+water+bottle', shopName: 'Amazon' },
+    { id: 'first-aid', name: 'First Aid Kit', category: 'Adventure', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+first+aid+kit', shopName: 'Amazon' },
+    { id: 'headlamp', name: 'Headlamp / Flashlight', category: 'Adventure', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=rechargeable+headlamp', shopName: 'Amazon' },
+    { id: 'rain-jacket', name: 'Waterproof Rain Jacket', category: 'Adventure', essential: true, quantity: 1 },
+    { id: 'bug-spray', name: 'Insect Repellent', category: 'Adventure', essential: true, quantity: 1 },
+    { id: 'trekking-poles', name: 'Trekking Poles', category: 'Adventure', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=collapsible+trekking+poles', shopName: 'Amazon' },
+  ],
+  business: [
+    { id: 'suit', name: 'Business Suit / Dress', category: 'Business', essential: true, quantity: 1 },
+    { id: 'dress-shoes', name: 'Dress Shoes', category: 'Business', essential: true, quantity: 1 },
+    { id: 'dress-shirts', name: 'Dress Shirts / Blouses', category: 'Business', essential: true, quantity: 3 },
+    { id: 'laptop', name: 'Laptop + Charger', category: 'Business', essential: true, quantity: 1 },
+    { id: 'laptop-bag', name: 'Laptop Bag', category: 'Business', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=professional+laptop+bag', shopName: 'Amazon' },
+    { id: 'business-cards', name: 'Business Cards', category: 'Business', essential: false, quantity: 1 },
+    { id: 'notebook', name: 'Notebook + Pen', category: 'Business', essential: false, quantity: 1 },
+    { id: 'belt', name: 'Belt', category: 'Business', essential: true, quantity: 1 },
+    { id: 'garment-bag', name: 'Garment Bag', category: 'Business', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+garment+bag', shopName: 'Amazon' },
+  ],
+  winter: [
+    { id: 'winter-coat', name: 'Winter Coat', category: 'Winter', essential: true, quantity: 1 },
+    { id: 'thermal-underwear', name: 'Thermal Base Layers', category: 'Winter', essential: true, quantity: 2, shopUrl: 'https://www.amazon.com/s?k=thermal+underwear', shopName: 'Amazon' },
+    { id: 'warm-sweater', name: 'Warm Sweaters / Fleece', category: 'Winter', essential: true, quantity: 2 },
+    { id: 'winter-boots', name: 'Waterproof Winter Boots', category: 'Winter', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=waterproof+winter+boots', shopName: 'Amazon' },
+    { id: 'gloves', name: 'Warm Gloves', category: 'Winter', essential: true, quantity: 1 },
+    { id: 'beanie', name: 'Beanie / Warm Hat', category: 'Winter', essential: true, quantity: 1 },
+    { id: 'scarf', name: 'Scarf', category: 'Winter', essential: false, quantity: 1 },
+    { id: 'hand-warmers', name: 'Hand Warmers', category: 'Winter', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=hand+warmers', shopName: 'Amazon' },
+    { id: 'lip-balm', name: 'Lip Balm (SPF)', category: 'Winter', essential: true, quantity: 1 },
+  ],
+  backpacking: [
+    { id: 'travel-backpack', name: 'Travel Backpack (40-60L)', category: 'Backpacking', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+backpack+40L', shopName: 'Amazon' },
+    { id: 'packing-cubes', name: 'Packing Cubes', category: 'Backpacking', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=packing+cubes', shopName: 'Amazon' },
+    { id: 'quick-dry-towel', name: 'Quick-Dry Microfiber Towel', category: 'Backpacking', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=microfiber+travel+towel', shopName: 'Amazon' },
+    { id: 'padlock', name: 'TSA Lock / Padlock', category: 'Backpacking', essential: true, quantity: 2, shopUrl: 'https://www.amazon.com/s?k=tsa+lock', shopName: 'Amazon' },
+    { id: 'earplugs', name: 'Earplugs + Eye Mask', category: 'Backpacking', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+sleep+kit', shopName: 'Amazon' },
+    { id: 'money-belt', name: 'Money Belt', category: 'Backpacking', essential: true, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+money+belt', shopName: 'Amazon' },
+    { id: 'hostel-sheet', name: 'Sleep Sheet / Liner', category: 'Backpacking', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=travel+sleep+sheet', shopName: 'Amazon' },
+    { id: 'dry-bag', name: 'Dry Bag', category: 'Backpacking', essential: false, quantity: 1, shopUrl: 'https://www.amazon.com/s?k=waterproof+dry+bag', shopName: 'Amazon' },
+  ],
+};
+
+const tripTypeLabels: Record<TripType, { label: string; icon: string }> = {
+  beach: { label: 'Beach / Resort', icon: '🏖️' },
+  city: { label: 'City Break', icon: '🏙️' },
+  adventure: { label: 'Adventure / Hiking', icon: '🥾' },
+  business: { label: 'Business Trip', icon: '💼' },
+  winter: { label: 'Winter / Ski', icon: '❄️' },
+  backpacking: { label: 'Backpacking', icon: '🎒' },
+};
 
 export default function PackingPage() {
-  const [destination, setDestination] = useState('');
-  const [tripType, setTripType] = useState('leisure');
-  const [duration, setDuration] = useState('7');
-  const [travelDate, setTravelDate] = useState('');
-  const [activities, setActivities] = useState<string[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [packingList, setPackingList] = useState<PackingList | null>(null);
+  const [tripType, setTripType] = useState<TripType | ''>('');
+  const [duration, setDuration] = useState<Duration>('4-7');
+  const [generated, setGenerated] = useState(false);
   const [packedItems, setPackedItems] = useState<Set<string>>(new Set());
 
-  const activityOptions = [
-    { id: 'beach', label: '🏖️ Beach', icon: '🏖️' },
-    { id: 'hiking', label: '🥾 Hiking', icon: '🥾' },
-    { id: 'business', label: '💼 Business', icon: '💼' },
-    { id: 'nightlife', label: '🎉 Nightlife', icon: '🎉' },
-    { id: 'photography', label: '📷 Photography', icon: '📷' },
-    { id: 'winter-sports', label: '⛷️ Winter Sports', icon: '⛷️' },
-  ];
+  const packingList = useMemo(() => {
+    if (!tripType) return [];
 
-  const handleGenerate = async () => {
-    if (!destination) return;
-    setIsGenerating(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const items: PackingItem[] = [];
     
-    const demoList: PackingList = {
-      destination: destination,
-      weather: 'Partly Cloudy',
-      temperature: '65-78°F (18-26°C)',
-      categories: [
-        {
-          name: 'Clothing',
-          icon: '👕',
-          items: [
-            { name: 'T-shirts', quantity: parseInt(duration), category: 'Clothing', essential: true, packed: false },
-            { name: 'Pants/Shorts', quantity: Math.ceil(parseInt(duration) / 2), category: 'Clothing', essential: true, packed: false },
-            { name: 'Underwear', quantity: parseInt(duration) + 2, category: 'Clothing', essential: true, packed: false },
-            { name: 'Socks', quantity: parseInt(duration), category: 'Clothing', essential: true, packed: false },
-            { name: 'Light jacket', quantity: 1, category: 'Clothing', essential: true, packed: false },
-            { name: 'Comfortable walking shoes', quantity: 1, category: 'Clothing', essential: true, packed: false },
-            { name: 'Sandals/flip-flops', quantity: 1, category: 'Clothing', essential: false, packed: false },
-          ],
-        },
-        {
-          name: 'Toiletries',
-          icon: '🧴',
-          items: [
-            { name: 'Toothbrush & toothpaste', quantity: 1, category: 'Toiletries', essential: true, packed: false },
-            { name: 'Deodorant', quantity: 1, category: 'Toiletries', essential: true, packed: false },
-            { name: 'Shampoo (travel size)', quantity: 1, category: 'Toiletries', essential: true, packed: false },
-            { name: 'Sunscreen', quantity: 1, category: 'Toiletries', essential: true, packed: false },
-            { name: 'Razor', quantity: 1, category: 'Toiletries', essential: false, packed: false },
-            { name: 'Medications', quantity: 1, category: 'Toiletries', essential: true, packed: false },
-          ],
-        },
-        {
-          name: 'Electronics',
-          icon: '📱',
-          items: [
-            { name: 'Phone + charger', quantity: 1, category: 'Electronics', essential: true, packed: false },
-            { name: 'Power adapter', quantity: 1, category: 'Electronics', essential: true, packed: false },
-            { name: 'Portable battery pack', quantity: 1, category: 'Electronics', essential: false, packed: false },
-            { name: 'Camera', quantity: 1, category: 'Electronics', essential: false, packed: false },
-            { name: 'Headphones', quantity: 1, category: 'Electronics', essential: false, packed: false },
-          ],
-        },
-        {
-          name: 'Documents',
-          icon: '📄',
-          items: [
-            { name: 'Passport', quantity: 1, category: 'Documents', essential: true, packed: false },
-            { name: 'Travel insurance docs', quantity: 1, category: 'Documents', essential: true, packed: false },
-            { name: 'Hotel confirmations', quantity: 1, category: 'Documents', essential: true, packed: false },
-            { name: 'Credit cards', quantity: 2, category: 'Documents', essential: true, packed: false },
-            { name: 'Emergency contacts list', quantity: 1, category: 'Documents', essential: true, packed: false },
-          ],
-        },
-        {
-          name: 'Miscellaneous',
-          icon: '🎒',
-          items: [
-            { name: 'Day bag/backpack', quantity: 1, category: 'Miscellaneous', essential: true, packed: false },
-            { name: 'Reusable water bottle', quantity: 1, category: 'Miscellaneous', essential: false, packed: false },
-            { name: 'Travel pillow', quantity: 1, category: 'Miscellaneous', essential: false, packed: false },
-            { name: 'Snacks', quantity: 1, category: 'Miscellaneous', essential: false, packed: false },
-          ],
-        },
-      ],
-    };
+    // Add base essentials
+    items.push(...baseItems.essentials);
+    
+    // Adjust clothing quantities based on duration
+    const durationMultiplier = duration === '1-3' ? 0.6 : duration === '4-7' ? 1 : duration === '8-14' ? 1.5 : 2;
+    baseItems.clothing.forEach(item => {
+      items.push({
+        ...item,
+        quantity: Math.ceil(item.quantity * durationMultiplier),
+      });
+    });
+    
+    // Add toiletries and electronics
+    items.push(...baseItems.toiletries);
+    items.push(...baseItems.electronics);
+    
+    // Add trip-type specific items
+    items.push(...tripTypeItems[tripType]);
 
-    // Add activity-specific items
-    if (activities.includes('beach')) {
-      demoList.categories[0].items.push(
-        { name: 'Swimsuit', quantity: 2, category: 'Clothing', essential: true, packed: false },
-        { name: 'Beach towel', quantity: 1, category: 'Clothing', essential: false, packed: false }
-      );
-    }
-    if (activities.includes('hiking')) {
-      demoList.categories[0].items.push(
-        { name: 'Hiking boots', quantity: 1, category: 'Clothing', essential: true, packed: false },
-        { name: 'Quick-dry clothing', quantity: 2, category: 'Clothing', essential: true, packed: false }
-      );
-    }
+    return items;
+  }, [tripType, duration]);
 
-    setPackingList(demoList);
-    setIsGenerating(false);
-  };
-
-  const togglePacked = (itemName: string) => {
+  const togglePacked = (itemId: string) => {
     setPackedItems(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(itemName)) {
-        newSet.delete(itemName);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
       } else {
-        newSet.add(itemName);
+        newSet.add(itemId);
       }
       return newSet;
     });
   };
 
-  const totalItems = packingList?.categories.reduce((sum, cat) => sum + cat.items.length, 0) || 0;
   const packedCount = packedItems.size;
-  const progressPercent = totalItems > 0 ? Math.round((packedCount / totalItems) * 100) : 0;
+  const totalCount = packingList.length;
+  const progress = totalCount > 0 ? Math.round((packedCount / totalCount) * 100) : 0;
+
+  const handleGenerate = () => {
+    if (tripType) {
+      setGenerated(true);
+      setPackedItems(new Set());
+    }
+  };
+
+  // Group items by category
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, PackingItem[]> = {};
+    packingList.forEach(item => {
+      if (!groups[item.category]) {
+        groups[item.category] = [];
+      }
+      groups[item.category].push(item);
+    });
+    return groups;
+  }, [packingList]);
 
   return (
     <>
@@ -157,239 +204,231 @@ export default function PackingPage() {
           <ToolPageHeader 
             icon="🎒"
             name="PackSmart"
-            tagline="AI Packing Assistant"
-            description="Get a personalized packing list based on your destination, weather, trip type, and planned activities."
+            tagline="Packing List Generator"
+            description="Never forget anything again. Get a personalized packing list based on your trip type and duration."
           />
 
-          {/* Input Form */}
+          {/* Generator Form */}
           <div className="max-w-3xl mx-auto mb-12">
             <div className="bg-white rounded-3xl shadow-elevated p-6 md:p-8 border border-midnight-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Destination</label>
-                  <input
-                    type="text"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="e.g., Tokyo, Japan"
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Travel Date</label>
-                  <input
-                    type="date"
-                    value={travelDate}
-                    onChange={(e) => setTravelDate(e.target.value)}
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400 focus:ring-2 focus:ring-coral-400/20 transition-all"
-                  />
-                </div>
-              </div>
+              <h3 className="text-lg font-display font-semibold text-midnight-900 mb-6">
+                Tell us about your trip
+              </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Trip Type</label>
-                  <select
-                    value={tripType}
-                    onChange={(e) => setTripType(e.target.value)}
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400"
-                  >
-                    <option value="leisure">🏖️ Leisure</option>
-                    <option value="business">💼 Business</option>
-                    <option value="adventure">🏔️ Adventure</option>
-                    <option value="backpacking">🎒 Backpacking</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-midnight-600 mb-2">Duration</label>
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(e.target.value)}
-                    className="w-full px-4 py-3 bg-midnight-50 border border-midnight-200 rounded-xl text-midnight-900 focus:outline-none focus:border-coral-400"
-                  >
-                    <option value="3">3 days</option>
-                    <option value="5">5 days</option>
-                    <option value="7">1 week</option>
-                    <option value="14">2 weeks</option>
-                    <option value="21">3 weeks</option>
-                    <option value="30">1 month</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Activities */}
+              {/* Trip Type Selection */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-midnight-600 mb-3">Planned Activities</label>
-                <div className="flex flex-wrap gap-2">
-                  {activityOptions.map((activity) => (
+                <label className="block text-sm font-medium text-midnight-600 mb-3">
+                  What type of trip?
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {(Object.keys(tripTypeLabels) as TripType[]).map(type => (
                     <button
-                      key={activity.id}
-                      onClick={() => setActivities(prev => 
-                        prev.includes(activity.id) 
-                          ? prev.filter(a => a !== activity.id)
-                          : [...prev, activity.id]
-                      )}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        activities.includes(activity.id)
-                          ? 'bg-coral-500 text-white'
-                          : 'bg-midnight-50 text-midnight-600 hover:bg-midnight-100'
+                      key={type}
+                      onClick={() => setTripType(type)}
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${
+                        tripType === type
+                          ? 'border-coral-400 bg-coral-50'
+                          : 'border-midnight-200 hover:border-coral-300 hover:bg-coral-50/50'
                       }`}
                     >
-                      {activity.label}
+                      <span className="text-2xl mb-2 block">{tripTypeLabels[type].icon}</span>
+                      <span className="font-medium text-midnight-900">{tripTypeLabels[type].label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
+              {/* Duration Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-midnight-600 mb-3">
+                  Trip duration
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {(['1-3', '4-7', '8-14', '15+'] as Duration[]).map(d => (
+                    <button
+                      key={d}
+                      onClick={() => setDuration(d)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        duration === d
+                          ? 'bg-coral-500 text-white'
+                          : 'bg-midnight-50 text-midnight-600 hover:bg-coral-50'
+                      }`}
+                    >
+                      {d === '15+' ? '15+ days' : `${d} days`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate Button */}
               <button
                 onClick={handleGenerate}
-                disabled={!destination || isGenerating}
-                className="w-full inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:shadow-coral-400/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-50"
+                disabled={!tripType}
+                className="w-full inline-flex items-center justify-center gap-2 px-8 py-4 bg-gradient-to-r from-coral-400 to-coral-500 text-white font-semibold rounded-xl shadow-lg shadow-coral-400/25 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isGenerating ? (
-                  <>
-                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Generating Your List...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                    Generate Packing List
-                  </>
-                )}
+                🎒 Generate Packing List
               </button>
             </div>
           </div>
 
-          {/* Packing List */}
-          {packingList && (
+          {/* Packing List Results */}
+          {generated && tripType && packingList.length > 0 && (
             <div className="max-w-4xl mx-auto mb-16 animate-fade-in">
-              {/* Weather & Progress */}
-              <div className="grid md:grid-cols-2 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl p-6 text-white">
-                  <div className="flex items-center gap-4">
-                    <span className="text-5xl">⛅</span>
-                    <div>
-                      <p className="text-teal-100 text-sm">Weather in {packingList.destination}</p>
-                      <p className="text-2xl font-semibold">{packingList.weather}</p>
-                      <p className="text-teal-100">{packingList.temperature}</p>
-                    </div>
+              {/* Progress Header */}
+              <div className="bg-white rounded-2xl p-6 border border-midnight-100 mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="text-2xl font-display font-semibold text-midnight-900">
+                      Your {tripTypeLabels[tripType].icon} {tripTypeLabels[tripType].label} Packing List
+                    </h2>
+                    <p className="text-midnight-500">{duration === '15+' ? '15+' : duration} days · {totalCount} items</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-coral-500">{progress}%</p>
+                    <p className="text-sm text-midnight-500">packed</p>
                   </div>
                 </div>
-                <div className="bg-white rounded-2xl border border-midnight-100 p-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-midnight-600">Packing Progress</span>
-                    <span className="text-coral-500 font-semibold">{packedCount}/{totalItems} items</span>
-                  </div>
-                  <div className="h-3 bg-midnight-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-coral-400 to-coral-500 rounded-full transition-all duration-500"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <p className="text-sm text-midnight-500 mt-2">
-                    {progressPercent === 100 ? '🎉 All packed!' : `${100 - progressPercent}% left to pack`}
-                  </p>
+                {/* Progress Bar */}
+                <div className="h-3 bg-midnight-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-coral-400 to-coral-500 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
                 </div>
               </div>
 
-              {/* Categories */}
+              {/* Categorized Items */}
               <div className="space-y-6">
-                {packingList.categories.map((category) => (
-                  <div key={category.name} className="bg-white rounded-2xl border border-midnight-100 overflow-hidden">
-                    <div className="px-6 py-4 bg-midnight-50 border-b border-midnight-100 flex items-center justify-between">
-                      <h3 className="font-display font-semibold text-midnight-900 flex items-center gap-2">
-                        <span className="text-xl">{category.icon}</span>
-                        {category.name}
-                      </h3>
-                      <span className="text-sm text-midnight-500">
-                        {category.items.filter(i => packedItems.has(i.name)).length}/{category.items.length}
-                      </span>
+                {Object.entries(groupedItems).map(([category, items]) => (
+                  <div key={category} className="bg-white rounded-2xl border border-midnight-100 overflow-hidden">
+                    <div className="px-6 py-4 bg-midnight-50 border-b border-midnight-100">
+                      <h3 className="font-semibold text-midnight-900">{category}</h3>
                     </div>
-                    <div className="p-4">
-                      <div className="grid sm:grid-cols-2 gap-2">
-                        {category.items.map((item) => (
-                          <button
-                            key={item.name}
-                            onClick={() => togglePacked(item.name)}
-                            className={`flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                              packedItems.has(item.name)
-                                ? 'bg-teal-50 text-teal-700'
-                                : 'bg-midnight-50 text-midnight-700 hover:bg-midnight-100'
-                            }`}
-                          >
-                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                              packedItems.has(item.name)
-                                ? 'bg-teal-500 border-teal-500'
-                                : 'border-midnight-300'
-                            }`}>
-                              {packedItems.has(item.name) && (
-                                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <div className="divide-y divide-midnight-100">
+                      {items.map(item => (
+                        <div 
+                          key={item.id}
+                          className={`px-6 py-4 flex items-center justify-between gap-4 transition-colors ${
+                            packedItems.has(item.id) ? 'bg-green-50/50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => togglePacked(item.id)}
+                              className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+                                packedItems.has(item.id)
+                                  ? 'bg-teal-500 border-teal-500 text-white'
+                                  : 'border-midnight-300 hover:border-coral-400'
+                              }`}
+                            >
+                              {packedItems.has(item.id) && (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                 </svg>
                               )}
+                            </button>
+                            <div>
+                              <p className={`font-medium ${packedItems.has(item.id) ? 'text-midnight-400 line-through' : 'text-midnight-900'}`}>
+                                {item.name}
+                                {item.essential && (
+                                  <span className="ml-2 text-xs text-coral-500 font-normal">Essential</span>
+                                )}
+                              </p>
+                              {item.quantity > 1 && (
+                                <p className="text-sm text-midnight-500">Qty: {item.quantity}</p>
+                              )}
                             </div>
-                            <span className={packedItems.has(item.name) ? 'line-through' : ''}>
-                              {item.name}
-                              {item.quantity > 1 && <span className="text-midnight-400 ml-1">×{item.quantity}</span>}
-                            </span>
-                            {item.essential && (
-                              <span className="ml-auto text-xs bg-coral-100 text-coral-600 px-2 py-0.5 rounded-full">
-                                Essential
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                          </div>
+                          {item.shopUrl && (
+                            <a
+                              href={item.shopUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1.5 text-sm bg-gold-100 hover:bg-gold-200 text-gold-800 rounded-lg transition-colors flex items-center gap-1"
+                            >
+                              🛒 Shop
+                            </a>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Actions */}
-              <div className="mt-8 flex flex-wrap gap-4 justify-center">
-                <button className="px-6 py-3 bg-midnight-900 hover:bg-midnight-800 text-white font-medium rounded-xl transition-colors">
-                  📥 Download PDF
-                </button>
-                <button className="px-6 py-3 bg-white border border-midnight-200 hover:border-coral-400 text-midnight-700 font-medium rounded-xl transition-colors">
-                  ✉️ Email List
-                </button>
-                <button 
-                  onClick={() => setPackedItems(new Set())}
-                  className="px-6 py-3 bg-white border border-midnight-200 hover:border-midnight-300 text-midnight-500 font-medium rounded-xl transition-colors"
+              {/* Print / Save Actions */}
+              <div className="mt-6 flex flex-wrap gap-4 justify-center">
+                <button
+                  onClick={() => window.print()}
+                  className="px-6 py-3 bg-midnight-100 hover:bg-midnight-200 text-midnight-700 font-medium rounded-xl transition-colors flex items-center gap-2"
                 >
-                  ↻ Reset
+                  🖨️ Print List
+                </button>
+                <button
+                  onClick={() => setPackedItems(new Set())}
+                  className="px-6 py-3 bg-midnight-100 hover:bg-midnight-200 text-midnight-700 font-medium rounded-xl transition-colors flex items-center gap-2"
+                >
+                  🔄 Reset Checkboxes
                 </button>
               </div>
             </div>
           )}
 
+          {/* Travel Gear Section */}
+          <div className="max-w-4xl mx-auto mb-12">
+            <h3 className="text-xl font-display font-semibold text-midnight-900 mb-6 text-center">
+              Essential Travel Gear
+            </h3>
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                { name: 'Packing Cubes', icon: '📦', desc: 'Stay organized', url: 'https://www.amazon.com/s?k=packing+cubes' },
+                { name: 'Travel Adapter', icon: '🔌', desc: 'Power anywhere', url: 'https://www.amazon.com/s?k=universal+travel+adapter' },
+                { name: 'Neck Pillow', icon: '💤', desc: 'Sleep on flights', url: 'https://www.amazon.com/s?k=travel+neck+pillow' },
+                { name: 'Toiletry Bag', icon: '🧴', desc: 'TSA-approved', url: 'https://www.amazon.com/s?k=tsa+toiletry+bag' },
+                { name: 'Luggage Scale', icon: '⚖️', desc: 'Avoid fees', url: 'https://www.amazon.com/s?k=luggage+scale' },
+                { name: 'Travel Wallet', icon: '👝', desc: 'RFID blocking', url: 'https://www.amazon.com/s?k=rfid+travel+wallet' },
+              ].map(item => (
+                <a
+                  key={item.name}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-white rounded-xl border border-midnight-100 p-4 hover:shadow-card-hover hover:border-coral-200 transition-all flex items-center gap-4"
+                >
+                  <span className="text-3xl">{item.icon}</span>
+                  <div>
+                    <p className="font-medium text-midnight-900">{item.name}</p>
+                    <p className="text-sm text-midnight-500">{item.desc}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+            <p className="text-xs text-midnight-400 text-center mt-4">
+              Links go to Amazon. WAYFARE may earn a commission on purchases.
+            </p>
+          </div>
+
           {/* Info Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <WhyUseCard 
               points={[
-                'Weather-aware packing suggestions',
-                'Activity-specific gear recommendations',
-                'Interactive checklist with progress tracking',
-                'Export to PDF or email',
+                'Customized for your trip type',
+                'Adjusts for trip duration',
+                'Interactive checklist',
+                'Links to buy what you need',
               ]}
             />
             <HowAICard 
-              description="PackSmart analyzes your destination's weather forecast and trip activities to generate a personalized packing list."
+              description="PackSmart generates lists based on trip type, duration, and common travel needs. Quantities adjust automatically."
               capabilities={[
-                'Weather forecast integration',
-                'Activity-based recommendations',
-                'Quantity optimization',
-                'Carry-on vs checked suggestions',
+                '6 trip type templates',
+                'Duration-based quantities',
+                'Essential item flagging',
+                'Category organization',
               ]}
             />
             <QphiQInsight 
-              insight="Roll clothes instead of folding to save space and reduce wrinkles. Packing cubes are a game-changer for organization — color code by outfit or day."
+              insight="Roll clothes instead of folding — it saves space and reduces wrinkles. Packing cubes are a game-changer for staying organized."
             />
           </div>
         </div>
