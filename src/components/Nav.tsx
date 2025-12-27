@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 const tools = [
@@ -21,12 +21,30 @@ const tools = [
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setToolsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToolClick = () => {
+    setToolsOpen(false);
+    setMobileOpen(false);
+  };
 
   return (
     <nav 
@@ -52,10 +70,9 @@ export default function Nav() {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
             {/* Tools Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setToolsOpen(!toolsOpen)}
-                onBlur={() => setTimeout(() => setToolsOpen(false), 200)}
                 className="flex items-center gap-2 text-midnight-600 hover:text-coral-500 font-medium transition-colors"
               >
                 Tools
@@ -77,6 +94,7 @@ export default function Nav() {
                       <Link
                         key={tool.name}
                         href={tool.href}
+                        onClick={handleToolClick}
                         className="flex items-center gap-3 p-3 rounded-xl hover:bg-coral-50 transition-colors group"
                       >
                         <span className="text-2xl group-hover:scale-110 transition-transform">
@@ -121,7 +139,7 @@ export default function Nav() {
 
             {/* Mobile Menu Button */}
             <button
-              onClick={() => setToolsOpen(!toolsOpen)}
+              onClick={() => setMobileOpen(!mobileOpen)}
               className="lg:hidden p-2 text-midnight-600 hover:text-coral-500 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -133,7 +151,7 @@ export default function Nav() {
       </div>
 
       {/* Mobile Menu */}
-      {toolsOpen && (
+      {mobileOpen && (
         <div className="lg:hidden bg-white border-t border-midnight-100 shadow-lg">
           <div className="max-w-7xl mx-auto px-4 py-6">
             <div className="grid grid-cols-2 gap-3">
@@ -142,7 +160,7 @@ export default function Nav() {
                   key={tool.name}
                   href={tool.href}
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-coral-50 transition-colors"
-                  onClick={() => setToolsOpen(false)}
+                  onClick={handleToolClick}
                 >
                   <span className="text-xl">{tool.icon}</span>
                   <span className="font-medium text-midnight-700">{tool.name}</span>
